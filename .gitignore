@@ -1,0 +1,20 @@
+# Composer — vendor dibuat ulang saat deploy (composer install)
+/vendor/
+
+# ============================================
+# JANGAN DI-COMMIT KE GITHUB
+# ============================================
+
+# Folder mirror deploy & backup database lokal (berisi data sensitif)
+/hosting/
+/backups/
+
+# Upload runtime — isi tidak di-versioning, tapi .htaccess tetap di-track
+/uploads/backups/*
+!/uploads/backups/.htaccess
+/uploads/payments/*
+!/uploads/payments/.htaccess
+/uploads/story/*
+/uploads/products/*
+/uploads/hero/*
+/uploads/branches/*

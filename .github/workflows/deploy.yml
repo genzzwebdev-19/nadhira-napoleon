@@ -1,0 +1,78 @@
+# ============================================
+# 🚀 DEPLOY OTOMATIS — GitHub Actions → InfinityFree
+# ============================================
+# Alur: push ke branch `main` (atau tombol "Run workflow"
+# di tab Actions) → composer install → upload via FTP
+# ke folder htdocs/nadhira-napoleon.infinityfreeapp.com/
+#
+# ⚠️ SEBELUM PERTAMA KALI — tambahkan 2 secret di
+#    GitHub repo: Settings → Secrets and variables → Actions:
+#      - FTP_USERNAME  : username FTP dari InfinityFree
+#                        (Client Area → Accounts → FTP Details)
+#      - FTP_PASSWORD  : password FTP InfinityFree
+#    (Server FTP selalu ftpupload.net, sudah di-hardcode.)
+#
+# 📄 File yang TIDAK di-upload (dikelola manual di server):
+#    - config/database.php  → kredensial DB PRODUKSI di server
+#    - uploads/backups, uploads/payments, uploads/story,
+#      uploads/products, uploads/hero, uploads/branches
+#      → data runtime di server TIDAK akan dihapus/ditimpa
+# ============================================
+
+name: 🚀 Deploy ke InfinityFree
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-infinityfree
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy website
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 📥 Checkout kode
+        uses: actions/checkout@v4
+
+      - name: 🐘 Setup PHP + Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+          tools: composer:v2
+
+      - name: 📦 Install dependensi (vendor/)
+        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: 📂 Upload ke InfinityFree via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ftpupload.net
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          port: 21
+          server-dir: htdocs/nadhira-napoleon.infinityfreeapp.com/
+          timeout: 60000
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            .github/**
+            hosting/**
+            backups/**
+            *.md
+            .ftp-deploy-sync-state.json
+            config/database.php
+            uploads/backups/**
+            uploads/payments/**
+            uploads/story/**
+            uploads/products/**
+            uploads/hero/**
+            uploads/branches/**

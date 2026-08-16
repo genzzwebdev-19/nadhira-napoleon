@@ -1,0 +1,3 @@
+# Deny direct access to database backups
+# Files are served only via PHP pages with access control (admin/backup.php)
+Require all denied
