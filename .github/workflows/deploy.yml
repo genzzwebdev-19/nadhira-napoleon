@@ -58,7 +58,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftp
           port: 21
-          server-dir: htdocs/nadhira-napoleon.infinityfreeapp.com/
+          server-dir: /nadhira-napoleon.infinityfreeapp.com/htdocs/
           timeout: 60000
           exclude: |
             **/.git*
