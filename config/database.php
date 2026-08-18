@@ -1448,6 +1448,278 @@ function reverseOrderSold($orderId) {
 }
 
 // ============================================
+// STOK OTOMATIS (sinkron dengan pesanan)
+// ============================================
+// Stok produk dikurangi saat pesanan DIBUAT (reserve) dan dikembalikan saat
+// pesanan dibatalkan / pembayaran gagal. Kolom stock_deducted di tabel orders
+// berfungsi sebagai pengaman agar pengurangan & pengembalian hanya terjadi
+// SEKALI per pesanan (idempoten), mengikuti pola sold_counted / points_awarded.
+// Stok global (products.stock) selalu dikurangi; jika pesanan memakai cabang
+// (orders.branch_id), stok cabang (branch_products.stock) ikut dikurangi.
+
+// Pastikan kolom stock_deducted tersedia (self-healing untuk DB lama)
+function ensureStockDeductedColumn() {
+    $conn = getConnection();
+    if (!$conn) return false;
+    $r = $conn->query("SELECT COUNT(*) c FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'stock_deducted'");
+    if ($r && (int)$r->fetch_assoc()['c'] > 0) return true;
+    return $conn->query("ALTER TABLE orders ADD COLUMN stock_deducted TINYINT(1) NOT NULL DEFAULT 0 AFTER points_awarded");
+}
+
+// Kurangi stok produk untuk semua item pesanan (reserve saat order dibuat).
+// Idempoten: pesanan yang sudah pernah dikurangi tidak akan dikurangi ulang.
+// Mengembalikan jumlah unit yang dikurangi (0 jika tidak ada / sudah dihitung).
+function deductOrderStock($orderId) {
+    $conn = getConnection();
+    if (!$conn) return 0;
+    $orderId = (int)$orderId;
+    if ($orderId <= 0) return 0;
+    ensureStockDeductedColumn();
+
+    $r = $conn->query("SELECT stock_deducted, branch_id FROM orders WHERE id = $orderId LIMIT 1");
+    if (!$r || $r->num_rows === 0) return 0;
+    $o = $r->fetch_assoc();
+    if ((int)$o['stock_deducted'] === 1) return 0; // sudah pernah dikurangi
+
+    $branchId = (int)($o['branch_id'] ?? 0);
+    $items = $conn->query("SELECT product_id, quantity FROM order_items WHERE order_id = $orderId AND product_id > 0");
+    if (!$items || $items->num_rows === 0) return 0;
+
+    $deducted = 0;
+    while ($it = $items->fetch_assoc()) {
+        $pid = (int)$it['product_id'];
+        $qty = (int)$it['quantity'];
+        // Stok global produk
+        $conn->query("UPDATE products SET stock = GREATEST(stock - $qty, 0) WHERE id = $pid");
+        // Stok per cabang (hanya jika produk dijual di cabang tsb)
+        if ($branchId > 0) {
+            $conn->query("UPDATE branch_products SET stock = GREATEST(stock - $qty, 0) WHERE product_id = $pid AND branch_id = $branchId");
+        }
+        $deducted += $qty;
+    }
+    $conn->query("UPDATE orders SET stock_deducted = 1 WHERE id = $orderId");
+    return $deducted;
+}
+
+// Kembalikan stok produk saat pesanan dibatalkan / pembayaran gagal.
+// Hanya berjalan jika pesanan sudah pernah dikurangi (stock_deducted = 1),
+// sehingga pesanan yang batal sebelum dikurangi tidak menambah stok.
+function restoreOrderStock($orderId) {
+    $conn = getConnection();
+    if (!$conn) return 0;
+    $orderId = (int)$orderId;
+    if ($orderId <= 0) return 0;
+    ensureStockDeductedColumn();
+
+    $r = $conn->query("SELECT stock_deducted, branch_id FROM orders WHERE id = $orderId LIMIT 1");
+    if (!$r || $r->num_rows === 0) return 0;
+    $o = $r->fetch_assoc();
+    if ((int)$o['stock_deducted'] !== 1) return 0; // belum pernah dikurangi
+
+    $branchId = (int)($o['branch_id'] ?? 0);
+    $items = $conn->query("SELECT product_id, quantity FROM order_items WHERE order_id = $orderId AND product_id > 0");
+    if (!$items || $items->num_rows === 0) return 0;
+
+    $restored = 0;
+    while ($it = $items->fetch_assoc()) {
+        $pid = (int)$it['product_id'];
+        $qty = (int)$it['quantity'];
+        $conn->query("UPDATE products SET stock = stock + $qty WHERE id = $pid");
+        if ($branchId > 0) {
+            $conn->query("UPDATE branch_products SET stock = stock + $qty WHERE product_id = $pid AND branch_id = $branchId");
+        }
+        $restored += $qty;
+    }
+    $conn->query("UPDATE orders SET stock_deducted = 0 WHERE id = $orderId");
+    return $restored;
+}
+
+// ============================================
+// AKSI PESANAN OLEH USER (BATAL & KONFIRMASI TERIMA)
+// ============================================
+// User hanya bisa membatalkan pesanan yang statusnya masih 'pending' (belum
+// diproses/dikirim) dan belum lunas — pembatalan pesanan yang sudah dibayar
+// tetap lewat admin (perlu refund). Konfirmasi terima hanya untuk pesanan
+// berstatus 'shipped'. Keduanya memvalidasi kepemilikan (user_id).
+
+// Batalkan pesanan oleh pemiliknya. Mengembalikan array ['ok' => bool, 'message' => string].
+function cancelOrderByUser($orderId, $userId) {
+    $conn = getConnection();
+    if (!$conn) return ['ok' => false, 'message' => 'Koneksi database gagal'];
+    $orderId = (int)$orderId;
+    $userId = (int)$userId;
+    if ($orderId <= 0 || $userId <= 0) {
+        return ['ok' => false, 'message' => 'Data pesanan tidak valid'];
+    }
+
+    $r = $conn->query("SELECT * FROM orders WHERE id = $orderId AND user_id = $userId LIMIT 1");
+    if (!$r || $r->num_rows === 0) {
+        return ['ok' => false, 'message' => 'Pesanan tidak ditemukan'];
+    }
+    $order = $r->fetch_assoc();
+
+    if ($order['order_status'] === 'cancelled') {
+        return ['ok' => false, 'message' => 'Pesanan sudah dibatalkan sebelumnya'];
+    }
+    if ($order['order_status'] !== 'pending') {
+        return ['ok' => false, 'message' => 'Pesanan sudah diproses dan tidak bisa dibatalkan sendiri. Hubungi admin via WhatsApp.'];
+    }
+    if ($order['payment_status'] === 'paid') {
+        return ['ok' => false, 'message' => 'Pesanan sudah lunas — pembatalan perlu dilakukan admin (termasuk pengembalian dana).'];
+    }
+
+    // Kembalikan semua yang ter-reserve dari pesanan ini (idempoten, aman dipanggil berulang)
+    restoreOrderStock($orderId);                 // stok
+    reverseOrderSold($orderId);                  // jumlah terjual (jika sudah pernah dihitung)
+    // Reward (poin & total belanja) hanya dibalik bila benar-benar pernah diberikan
+    // (points_awarded = 1, artinya pesanan pernah lunas) — user hanya bisa batal saat
+    // belum lunas, jadi ini hampir selalu no-op; dijaga demi keamanan.
+    if ((int)($order['points_awarded'] ?? 0) === 1 && !empty($order['user_id'])) {
+        reverseOrderRewards((int)$order['user_id'], (float)$order['subtotal'], $order['order_number'], $orderId);
+    }
+    refundPointsForOrder($orderId);              // poin yang ditukar jadi diskon
+    cancelMembershipForOrder($orderId);          // langganan membership (jika ada)
+    if (!empty($order['promo_code'])) {
+        decrementPromoUsage($order['promo_code']); // kuota kode promo
+    }
+
+    $conn->query("UPDATE orders SET order_status = 'cancelled' WHERE id = $orderId");
+    if (function_exists('logActivity')) {
+        logActivity('edit', 'orders', "Pesanan #{$order['order_number']} dibatalkan oleh pelanggan");
+    }
+    return ['ok' => true, 'message' => 'Pesanan berhasil dibatalkan. Stok produk dikembalikan.'];
+}
+
+// Konfirmasi pesanan sudah diterima oleh pelanggan (order_status: shipped → delivered).
+function confirmReceivedByUser($orderId, $userId) {
+    $conn = getConnection();
+    if (!$conn) return ['ok' => false, 'message' => 'Koneksi database gagal'];
+    $orderId = (int)$orderId;
+    $userId = (int)$userId;
+    if ($orderId <= 0 || $userId <= 0) {
+        return ['ok' => false, 'message' => 'Data pesanan tidak valid'];
+    }
+
+    $r = $conn->query("SELECT * FROM orders WHERE id = $orderId AND user_id = $userId LIMIT 1");
+    if (!$r || $r->num_rows === 0) {
+        return ['ok' => false, 'message' => 'Pesanan tidak ditemukan'];
+    }
+    $order = $r->fetch_assoc();
+
+    if ($order['order_status'] === 'delivered') {
+        return ['ok' => false, 'message' => 'Pesanan ini sudah dikonfirmasi diterima'];
+    }
+    if ($order['order_status'] !== 'shipped') {
+        return ['ok' => false, 'message' => 'Pesanan belum berstatus dikirim — belum bisa konfirmasi terima.'];
+    }
+
+    $conn->query("UPDATE orders SET order_status = 'delivered' WHERE id = $orderId");
+    if (function_exists('logActivity')) {
+        logActivity('edit', 'orders', "Pesanan #{$order['order_number']} dikonfirmasi diterima oleh pelanggan");
+    }
+    return ['ok' => true, 'message' => 'Terima kasih! Pesanan ditandai sebagai sudah diterima.'];
+}
+
+// ============================================
+// AUTO-EXPIRE PESANAN PENDING (TIDAK DIBAYAR)
+// ============================================
+// Pesanan yang dibuat tapi tidak dibayar dalam batas waktu tertentu (default
+// 24 jam — sama dengan masa berlaku token Midtrans) otomatis dibatalkan.
+// Berfungsi sebagai jaring pengaman bila webhook Midtrans 'expire' tidak
+// sampai ke server (URL notifikasi belum diisi / server mati saat itu),
+// sehingga stok & kuota promo tidak terkunci selamanya. Semua yang ter-reserve
+// dikembalikan (stok, jumlah terjual, poin, kuota promo, membership).
+
+// Batas waktu kedaluwarsa (jam) — diatur di Admin > Pengaturan
+function getOrderExpiryHours() {
+    $h = (int)getSetting('order_expiry_hours', '24');
+    return max(1, min(720, $h)); // 1 jam s/d 30 hari
+}
+
+// Kunci rahasia untuk menjalankan auto-expire via HTTP (dipakai cron hosting).
+// Dibuat & disimpan otomatis bila belum ada — mengikuti pola autoBackupKey().
+function autoExpireKey(): string {
+    $key = trim((string)getSetting('auto_expire_key', ''));
+    if ($key !== '') return $key;
+
+    $key = 'naex_' . bin2hex(random_bytes(16));
+    $conn = getConnection();
+    if ($conn) {
+        $conn->query("INSERT INTO settings (setting_key, setting_value) VALUES ('auto_expire_key', '" . $conn->real_escape_string($key) . "')
+                      ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+    }
+    return $key;
+}
+
+// Jalankan auto-expire bila sudah waktunya (poor man's cron, throttle 1x/jam).
+// Dipanggil dari halaman depan & panel admin. Mengembalikan jumlah yang dibatalkan.
+function runOrderExpiryIfDue() {
+    $conn = getConnection();
+    if (!$conn) return 0;
+
+    // Throttle: maksimal 1x per 60 menit agar tidak memberatkan tiap request
+    $lastRun = (int)strtotime((string)getSetting('order_expiry_last_run', ''));
+    if ($lastRun > time() - 3600) return 0;
+
+    $conn->query("INSERT INTO settings (setting_key, setting_value) VALUES ('order_expiry_last_run', '" . date('Y-m-d H:i:s') . "')
+                  ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+
+    return expirePendingOrders();
+}
+
+// Batalkan semua pesanan yang belum dibayar & melewati batas waktu.
+function expirePendingOrders() {
+    $conn = getConnection();
+    if (!$conn) return 0;
+    $hours = getOrderExpiryHours();
+
+    $r = $conn->query("SELECT id FROM orders
+        WHERE order_status = 'pending'
+          AND payment_status IN ('pending', 'failed')
+          AND payment_method != 'cod'
+          AND created_at < DATE_SUB(NOW(), INTERVAL $hours HOUR)
+        LIMIT 200");
+    if (!$r || $r->num_rows === 0) return 0;
+
+    $expired = 0;
+    while ($row = $r->fetch_assoc()) {
+        if (expireOrder((int)$row['id'])) $expired++;
+    }
+    return $expired;
+}
+
+// Batalkan SATU pesanan karena kedaluwarsa (mirip cancelOrderByUser, tanpa validasi kepemilikan).
+function expireOrder($orderId) {
+    $conn = getConnection();
+    if (!$conn) return false;
+    $orderId = (int)$orderId;
+    if ($orderId <= 0) return false;
+
+    $r = $conn->query("SELECT * FROM orders WHERE id = $orderId AND order_status = 'pending' LIMIT 1");
+    if (!$r || $r->num_rows === 0) return false;
+    $order = $r->fetch_assoc();
+    if ($order['order_status'] === 'cancelled') return false;
+
+    restoreOrderStock($orderId);                 // kembalikan stok
+    reverseOrderSold($orderId);                  // balik jumlah terjual (jika pernah dihitung)
+    if ((int)($order['points_awarded'] ?? 0) === 1 && !empty($order['user_id'])) {
+        reverseOrderRewards((int)$order['user_id'], (float)$order['subtotal'], $order['order_number'], $orderId);
+    }
+    refundPointsForOrder($orderId);              // kembalikan poin yang ditukar jadi diskon
+    cancelMembershipForOrder($orderId);          // langganan membership (jika ada)
+    if (!empty($order['promo_code'])) {
+        decrementPromoUsage($order['promo_code']); // kuota kode promo
+    }
+
+    $conn->query("UPDATE orders SET order_status = 'cancelled' WHERE id = $orderId");
+    if (function_exists('logActivity')) {
+        logActivity('edit', 'orders', "Pesanan #{$order['order_number']} otomatis dibatalkan (tidak dibayar dalam " . getOrderExpiryHours() . " jam)");
+    }
+    return true;
+}
+
+// ============================================
 // SISTEM LOKASI CUSTOMER (GPS) & ONGKIR BERBASIS JARAK
 // ============================================
 // Self-healing schema untuk fitur lokasi dari lokasi.md:

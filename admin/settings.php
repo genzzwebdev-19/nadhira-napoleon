@@ -288,6 +288,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings']) && !
         'midtrans_client_key' => '',
         'midtrans_is_production' => '0',
         
+        // Auto-expire pesanan pending yang tidak dibayar (jam; default 24 = sama dengan masa berlaku token Midtrans)
+        'order_expiry_hours' => '24',
+        
         // WhatsApp OTP (verifikasi pendaftaran via kode OTP ke WA)
         'wa_otp_enabled' => '1',
         'wa_otp_token' => '',
@@ -942,6 +945,19 @@ require_once __DIR__ . '/layout.php';
                                value="<?= htmlspecialchars(settingVal('midtrans_server_key', '')) ?>"
                                placeholder="SB-Mid-server-xxxx" autocomplete="new-password">
                         <small style="color: var(--text-muted); font-size: 11px;">Server Key bersifat rahasia — hanya dipakai dari sisi server, tidak pernah dikirim ke browser.</small>
+                    </div>
+
+                    <div class="form-row" style="margin-top: 16px;">
+                        <div class="form-group">
+                            <label class="form-label">Auto-Expire Pesanan Belum Dibayar (jam)</label>
+                            <input type="number" name="order_expiry_hours" class="form-input" min="1" max="720"
+                                   value="<?= htmlspecialchars(settingVal('order_expiry_hours', '24')) ?>">
+                            <small style="color: var(--text-muted); font-size: 11px;">
+                                Pesanan berstatus <strong>pending</strong> yang tidak dibayar dalam X jam otomatis dibatalkan —
+                                stok &amp; kuota promo dikembalikan. Default 24 jam (sama dengan masa berlaku token Midtrans).
+                                Berlaku sebagai jaring pengaman bila webhook Midtrans 'expire' tidak sampai ke server.
+                            </small>
+                        </div>
                     </div>
                 </div>
 

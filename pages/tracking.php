@@ -411,6 +411,20 @@ include '../includes/header.php';
                             <i class="fas fa-file-pdf"></i>
                             Download Invoice PDF
                         </a>
+                        <?php if (isLoggedIn() && (int)$_SESSION['user_id'] === (int)$order['user_id']): ?>
+                            <?php if (in_array($order['order_status'], ['pending'], true) && $order['payment_status'] !== 'paid'): ?>
+                                <button type="button" class="btn btn-outline" style="color: #EF4444; border-color: #FECACA;"
+                                        onclick="userOrderAction('cancel_order', <?= (int)$order['id'] ?>, 'Batalkan pesanan ini? Stok produk akan dikembalikan.')">
+                                    <i class="fas fa-times-circle"></i> Batalkan Pesanan
+                                </button>
+                            <?php endif; ?>
+                            <?php if ($order['order_status'] === 'shipped'): ?>
+                                <button type="button" class="btn btn-primary"
+                                        onclick="userOrderAction('confirm_received', <?= (int)$order['id'] ?>, 'Konfirmasi bahwa pesanan sudah Anda terima?')">
+                                    <i class="fas fa-check-circle"></i> Konfirmasi Terima
+                                </button>
+                            <?php endif; ?>
+                        <?php endif; ?>
                         <a href="<?= SITE_URL ?>/pages/tracking.php" class="btn btn-outline">
                             <i class="fas fa-search"></i>
                             Lacak Pesanan Lain
@@ -510,5 +524,32 @@ include '../includes/header.php';
 })();
 </script>
 <?php endif; ?>
+
+<script>
+// Aksi pesanan oleh user: batalkan pesanan / konfirmasi terima (AJAX ke ajax/order-action.php)
+function userOrderAction(action, orderId, confirmMsg) {
+    if (!confirm(confirmMsg)) return;
+
+    var body = 'action=' + encodeURIComponent(action) + '&order_id=' + orderId + '&csrf_token=' + encodeURIComponent('<?= csrfToken() ?>');
+
+    fetch('<?= SITE_URL ?>/ajax/order-action.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+        if (data.success) {
+            showToast(data.message, 'success');
+            setTimeout(function () { location.reload(); }, 900);
+        } else {
+            showToast(data.message || 'Aksi gagal. Silakan coba lagi.', 'error');
+        }
+    })
+    .catch(function () {
+        showToast('Terjadi kesalahan. Silakan coba lagi.', 'error');
+    });
+}
+</script>
 
 <?php include '../includes/footer.php'; ?>

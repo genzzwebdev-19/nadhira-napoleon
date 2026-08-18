@@ -4,6 +4,12 @@
 // Premium Oleh-Oleh Khas Riau
 // ============================================
 require_once 'config/database.php';
+
+// Auto-expire pesanan pending yang tidak dibayar (poor man's cron — ringan, throttle 1x/jam)
+if (function_exists('runOrderExpiryIfDue')) {
+    runOrderExpiryIfDue();
+}
+
 $is_home = true; // flag for hero-specific navbar styling
 $page_title = 'Premium Oleh-Oleh Khas Riau';
 $meta_description = 'Pusat oleh-oleh premium khas Riau. Nikmati Napoleon, Pancake Durian, Cake, dan berbagai oleh-oleh khas Pekanbaru dengan cita rasa terbaik.';

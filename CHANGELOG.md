@@ -5,6 +5,46 @@
 
 ---
 
+## [1.23.0] — 2026-08-17
+
+### 📦 Stok Otomatis Sinkron dengan Pesanan
+
+#### 🙋 Aksi Pesanan oleh User (Batalkan & Konfirmasi Terima)
+Pelanggan kini bisa mengelola pesanannya sendiri tanpa harus menghubungi admin via WhatsApp.
+
+- **Batalkan Pesanan**: tombol **Batalkan** muncul di `auth/profile.php` (kartu "Pesanan Saya") & `pages/tracking.php` untuk pesanan berstatus `pending` dan belum lunas — pembatalan pesanan yang sudah dibayar tetap lewat admin (perlu refund). Saat dibatalkan, semua yang ter-reserve dikembalikan otomatis: stok produk (`restoreOrderStock`), jumlah terjual, poin & total belanja (`reverseOrderRewards`), poin yang ditukar jadi diskon (`refundPointsForOrder`), langganan membership, dan kuota kode promo (`decrementPromoUsage`)
+- **Konfirmasi Terima**: tombol **Konfirmasi Terima** muncul untuk pesanan berstatus `shipped` — pelanggan menandai pesanan sudah diterima (status → `delivered`) tanpa menunggu admin
+- **Helper baru** di `config/database.php`: `cancelOrderByUser($orderId, $userId)` & `confirmReceivedByUser($orderId, $userId)` — keduanya memvalidasi kepemilikan (order milik user yang login) & status yang diizinkan, dan dicatat ke `activity_logs`
+- **Endpoint baru** `ajax/order-action.php` (POST `action=cancel_order|confirm_received` + `order_id` + CSRF) — aksi hanya bisa dilakukan oleh pemilik pesanan, dengan konfirmasi di frontend
+
+### 📦 Stok Otomatis Sinkron dengan Pesanan
+
+#### ⏰ Auto-Expire Pesanan Pending (Tidak Dibayar)
+Pesanan yang dibuat tapi tidak dibayar dalam batas waktu tertentu otomatis dibatalkan — stok & kuota tidak terkunci selamanya.
+
+- **Batas waktu default 24 jam** (sama dengan masa berlaku token Midtrans), bisa diubah di **Admin → Pengaturan → Midtrans → Auto-Expire Pesanan Belum Dibayar (jam)** — kolom `settings.order_expiry_hours`, self-healing default `24`
+- **Helper baru** di `config/database.php`: `getOrderExpiryHours()`, `runOrderExpiryIfDue()` (throttle 1x/jam via `settings.order_expiry_last_run`), `expirePendingOrders()`, `expireOrder($orderId)`
+- **Pemicu (poor man's cron)**: `index.php` (halaman depan, paling sering dikunjungi) & `admin/layout.php` (sama seperti penjadwal backup otomatis) — keduanya memanggil `runOrderExpiryIfDue()`
+- **Runner khusus** `auto-expire.php` untuk cron sungguhan (CLI `php auto-expire.php [--force]` atau HTTP `?key=KUNCI&force=1`) — mengikuti pola `auto-backup.php`; kunci `auto_expire_key` **dibuat otomatis** (`autoExpireKey()`) dan panduan cron-nya ditampilkan di **Admin → Backup & Restore** (kartu "Auto-Expire Pesanan Belum Dibayar")
+- **Saat kedaluwarsa**, semua yang ter-reserve dikembalikan: stok produk (`restoreOrderStock`), jumlah terjual, poin & total belanja (hanya jika pernah diberikan), poin tukar diskon, kuota kode promo, dan langganan membership; status → `cancelled`, dicatat ke `activity_logs`
+- **Aman**: hanya pesanan `order_status = 'pending'` dengan `payment_status IN ('pending','failed')` & `payment_method != 'cod'` yang ikut di-expire — pesanan lunas/proses/kirim/selesai tidak pernah tersentuh
+- **Jaring pengaman**: bila webhook Midtrans `expire` tidak sampai ke server (URL notifikasi belum diisi / server mati), auto-expire ini yang membersihkan pesanan menggantung
+
+### 📦 Stok Otomatis Sinkron dengan Pesanan
+
+Sebelumnya stok produk hanya bisa diubah manual oleh admin — pesanan yang masuk **tidak pernah mengurangi stok** sehingga label "Tersedia/Sisa X/Habis" dan alert stok rendah di dashboard tidak akurat. Sekarang stok berkurang otomatis saat pesanan dibuat dan dikembalikan saat pesanan dibatalkan / pembayaran gagal.
+
+- **Helper baru** di `config/database.php`:
+  - `deductOrderStock($orderId)` — kurangi stok global `products.stock` untuk setiap item pesanan; jika pesanan memakai cabang (`orders.branch_id`), stok cabang `branch_products.stock` ikut dikurangi
+  - `restoreOrderStock($orderId)` — kebalikannya, hanya berjalan jika stok sudah pernah dikurangi
+  - Kolom baru `orders.stock_deducted` (flag idempoten, mengikuti pola `sold_counted`/`points_awarded`) — dibuat otomatis di DB lama via `ensureStockDeductedColumn()`; `schema.sql` diperbarui untuk instal fresh
+- **Saat pesanan dibuat** (`pages/checkout.php`, di dalam transaksi): stok di-reserve segera — mencegah kejual melebihi stok (overselling)
+- **Saat pesanan dibatalkan**: stok dikembalikan otomatis di `admin/orders.php`, `admin/order-detail.php`, `admin/shipping.php`
+- **Saat pembayaran gagal/expired/refund** (webhook & polling Midtrans di `config/midtrans.php`): stok dikembalikan; saat pembayaran lunas, `deductOrderStock()` juga dipanggil (idempoten) untuk menutup pesanan lama yang dibuat sebelum fitur ini
+- **Verifikasi manual** (`admin/payments.php`, `admin/order-detail.php`): verifikasi → pastikan stok ter-reserve; tolak/gagal → stok dikembalikan
+
+---
+
 ## [1.22.0] — 2026-08-15
 
 ### 🎯 Tiga Fitur Prioritas Tinggi Tuntas

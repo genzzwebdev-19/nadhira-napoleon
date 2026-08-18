@@ -22,6 +22,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_shipping'])) {
 
     $tracking_e = $conn->real_escape_string($tracking);
     $conn->query("UPDATE orders SET tracking_number = '$tracking_e', order_status = '$orderStatus' WHERE id = $orderId");
+    // Pesanan dibatalkan dari halaman pengiriman → kembalikan stok yang di-reserve
+    if ($orderStatus === 'cancelled' && function_exists('restoreOrderStock')) {
+        restoreOrderStock($orderId);
+    }
     $success = "Pengiriman pesanan #$orderId diperbarui (status: $orderStatus).";
     logActivity('edit', 'shipping', "Update pengiriman order #$orderId -> $orderStatus");
     header('Location: shipping.php');

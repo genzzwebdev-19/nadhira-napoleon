@@ -1,5 +1,6 @@
 <?php
 require_once '../config/database.php';
+require_once __DIR__ . '/../config/rbac.php'; // untuk csrfToken() pada aksi batal/konfirmasi terima
 
 if (!isLoggedIn()) {
     header('Location: ' . BASE_PATH . '/auth/login.php');
@@ -334,6 +335,18 @@ include '../includes/header.php';
                                 <div class="order-card-actions">
                                     <a class="order-action-btn" href="<?= SITE_URL ?>/pages/tracking.php?order_number=<?= urlencode($ord['order_number']) ?>&email=<?= urlencode($ord['customer_email']) ?>"><i class="fas fa-truck"></i> Lacak</a>
                                     <a class="order-action-btn order-action-btn-gold" href="<?= SITE_URL ?>/pages/invoice.php?order=<?= urlencode($ord['order_number']) ?>"><i class="fas fa-file-invoice"></i> Invoice</a>
+                                    <?php if (in_array($ord['order_status'], ['pending'], true) && $ord['payment_status'] !== 'paid'): ?>
+                                    <button type="button" class="order-action-btn" style="color: #EF4444; border-color: #FECACA; background: none; cursor: pointer; font: inherit; padding: 6px 12px; border-radius: 8px;"
+                                            onclick="userOrderAction('cancel_order', <?= (int)$ord['id'] ?>, 'Batalkan pesanan ini? Stok produk akan dikembalikan.')">
+                                        <i class="fas fa-times-circle"></i> Batalkan
+                                    </button>
+                                    <?php endif; ?>
+                                    <?php if ($ord['order_status'] === 'shipped'): ?>
+                                    <button type="button" class="order-action-btn order-action-btn-gold" style="background: none; cursor: pointer; font: inherit; padding: 6px 12px; border-radius: 8px;"
+                                            onclick="userOrderAction('confirm_received', <?= (int)$ord['id'] ?>, 'Konfirmasi bahwa pesanan sudah Anda terima?')">
+                                        <i class="fas fa-check-circle"></i> Konfirmasi Terima
+                                    </button>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -591,5 +604,32 @@ include '../includes/header.php';
         </div>
     </div>
 </section>
+
+<script>
+// Aksi pesanan oleh user: batalkan pesanan / konfirmasi terima (AJAX ke ajax/order-action.php)
+function userOrderAction(action, orderId, confirmMsg) {
+    if (!confirm(confirmMsg)) return;
+
+    var body = 'action=' + encodeURIComponent(action) + '&order_id=' + orderId + '&csrf_token=' + encodeURIComponent('<?= csrfToken() ?>');
+
+    fetch('<?= SITE_URL ?>/ajax/order-action.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+        if (data.success) {
+            showToast(data.message, 'success');
+            setTimeout(function () { location.reload(); }, 900);
+        } else {
+            showToast(data.message || 'Aksi gagal. Silakan coba lagi.', 'error');
+        }
+    })
+    .catch(function () {
+        showToast('Terjadi kesalahan. Silakan coba lagi.', 'error');
+    });
+}
+</script>
 
 <?php include '../includes/footer.php'; ?>

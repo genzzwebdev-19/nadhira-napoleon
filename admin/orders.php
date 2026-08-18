@@ -22,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     // Jika pesanan dibatalkan, kembalikan jumlah terjual & reward membership (poin/total belanja)
     if ($newStatus === 'cancelled') {
         reverseOrderSold($orderId); // kembalikan jumlah terjual (hanya jika sudah pernah dihitung)
+        if (function_exists('restoreOrderStock')) restoreOrderStock($orderId); // kembalikan stok (hanya jika pernah dikurangi)
         if ($orderRow) {
             if ($orderRow['order_status'] !== 'cancelled' && !empty($orderRow['user_id'])) {
                 // Poin & total belanja harus dibalik sesuai basis award (subtotal, bukan total+ongkir)

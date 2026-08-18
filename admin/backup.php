@@ -273,6 +273,11 @@ $nextRun = nextScheduledOccurrence((string)$autoCfg['auto_backup_frequency'], (s
 $cronUrl = SITE_URL . '/auto-backup.php?key=' . urlencode($autoKey);
 $cronCli = PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/../auto-backup.php');
 
+// Auto-expire pesanan belum dibayar (runner & kunci cron-nya)
+$expireKey = autoExpireKey();
+$expireCronUrl = SITE_URL . '/auto-expire.php?key=' . urlencode($expireKey);
+$expireCli = PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/../auto-expire.php');
+
 require_once __DIR__ . '/layout.php';
 ?>
 
@@ -368,6 +373,38 @@ require_once __DIR__ . '/layout.php';
                 <?= htmlspecialchars($cronCli) ?>
             </code>
             <p style="color: var(--text-muted);">Tanpa cron pun backup tetap berjalan karena otomatis dicek setiap halaman admin dibuka (bila jadwal sudah lewat).</p>
+        </div>
+    </details>
+</div>
+
+<!-- ============================================
+     AUTO-EXPIRE PESANAN (CRON)
+     ============================================ -->
+<div class="admin-card" style="border-top: 3px solid #EF4444;">
+    <h3 class="admin-card-title"><i class="fas fa-hourglass-end" style="color: #EF4444;"></i> Auto-Expire Pesanan Belum Dibayar
+        <span class="status-badge active">Aktif</span>
+    </h3>
+    <p style="color: var(--text-muted); font-size: 13px; line-height: 1.7;">
+        Pesanan berstatus <strong>pending</strong> yang tidak dibayar dalam batas waktu (default 24 jam — diatur di
+        <strong>Pengaturan &rarr; Midtrans</strong>) otomatis dibatalkan; stok &amp; kuota promo dikembalikan.
+        Fitur sudah berjalan otomatis (dicek setiap halaman depan/admin dibuka, throttle 1x/jam) — cron di bawah
+        hanya untuk ketepatan waktu penuh.
+    </p>
+
+    <details style="margin-top: 12px; border: 1px solid #eee; border-radius: 12px; padding: 14px 18px; background: #fbfaf8;">
+        <summary style="cursor: pointer; font-weight: 600; font-size: 13px; color: var(--text-dark);">
+            <i class="fas fa-cog"></i> Setup cron auto-expire di hosting / Task Scheduler Windows <span style="color: var(--text-muted); font-weight: 400;">(opsional — untuk ketepatan waktu penuh)</span>
+        </summary>
+        <div style="margin-top: 14px; font-size: 13px; line-height: 1.8;">
+            <p><strong>Metode 1 — Hosting cPanel (Cron Jobs):</strong> tambahkan perintah berikut (misal setiap jam):</p>
+            <code style="display: block; background: #1a1a2e; color: #D4A853; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; word-break: break-all;">
+                wget -q -O /dev/null "<?= htmlspecialchars($expireCronUrl) ?>"
+            </code>
+            <p><strong>Metode 2 — Windows / Laragon (Task Scheduler):</strong> buat tugas baru yang menjalankan:</p>
+            <code style="display: block; background: #1a1a2e; color: #D4A853; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; word-break: break-all;">
+                <?= htmlspecialchars($expireCli) ?>
+            </code>
+            <p style="color: var(--text-muted);">Tanpa cron pun fitur tetap berjalan otomatis lewat halaman depan &amp; panel admin.</p>
         </div>
     </details>
 </div>

@@ -36,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_payment'])) {
         $conn->query("UPDATE payment_confirmations SET status = 'verified', verified_by = $adminId, verified_at = NOW() WHERE id = $confId");
         $conn->query("UPDATE orders SET payment_status = 'paid' WHERE id = $orderId");
         countOrderSold($orderId); // tambah jumlah terjual produk dari pesanan lunas ini
+        deductOrderStock($orderId); // pastikan stok ter-reserve (idempoten)
         activateMembershipForOrder($orderId); // aktifkan langganan membership jika ada paketnya
         if (!empty($order['user_id'])) {
             awardOrderRewards((int)$order['user_id'], $order['subtotal'], $order['order_number'], $orderId); // poin hanya saat lunas
@@ -89,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_payment'])) {
     // Sinkronkan langganan membership & jumlah terjual: aktif saat lunas, batal saat dibatalkan
     if (isset($_POST['payment_status']) && $_POST['payment_status'] === 'paid') {
         countOrderSold($orderId); // tambah jumlah terjual produk dari pesanan lunas ini
+        deductOrderStock($orderId); // pastikan stok ter-reserve (idempoten)
         activateMembershipForOrder($orderId);
         if (!empty($order['user_id'])) {
             awardOrderRewards((int)$order['user_id'], $order['subtotal'], $order['order_number'], $orderId); // poin hanya saat lunas
@@ -98,8 +100,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_payment'])) {
             notifyPaymentPaid($orderId, $order['order_number'], $order['total']);
         }
     }
+    // Pembayaran gagal/refund (manual) → kembalikan stok yang di-reserve
+    if (isset($_POST['payment_status']) && in_array($_POST['payment_status'], ['failed', 'refunded'], true)) {
+        restoreOrderStock($orderId);
+    }
     if (isset($_POST['order_status']) && $_POST['order_status'] === 'cancelled') {
         reverseOrderSold($orderId); // kembalikan jumlah terjual (hanya jika sudah pernah dihitung)
+        if (function_exists('restoreOrderStock')) restoreOrderStock($orderId); // kembalikan stok (hanya jika pernah dikurangi)
         // Balik reward membership (poin belanja & total belanja) bila belum dibatalkan sebelumnya
         if ($order['order_status'] !== 'cancelled' && !empty($order['user_id'])) {
             reverseOrderRewards((int)$order['user_id'], $order['subtotal'], $order['order_number'], $orderId);

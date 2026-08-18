@@ -37,6 +37,8 @@ if (isset($_GET['verify']) || isset($_GET['reject'])) {
             $conn->query("UPDATE orders SET payment_status = 'paid' WHERE id = " . (int)$pc['order_id']);
             // Tambah jumlah terjual produk dari pesanan lunas ini
             countOrderSold((int)$pc['order_id']);
+            // Pastikan stok ter-reserve (idempoten)
+            if (function_exists('deductOrderStock')) deductOrderStock((int)$pc['order_id']);
             // Beri poin & total belanja (idempoten — hanya sekali per pesanan)
             if ($ord && $ord->num_rows > 0) {
                 $ow = $ord->fetch_assoc();
@@ -59,6 +61,8 @@ if (isset($_GET['verify']) || isset($_GET['reject'])) {
             logActivity('edit', 'payments', "Verifikasi pembayaran #$pcId (order {$pc['order_id']})");
         } else {
             $conn->query("UPDATE orders SET payment_status = 'failed' WHERE id = " . (int)$pc['order_id']);
+            // Pembayaran ditolak → kembalikan stok yang di-reserve
+            if (function_exists('restoreOrderStock')) restoreOrderStock((int)$pc['order_id']);
             $info = 'Pembayaran #' . $pcId . ' ditolak.';
             logActivity('edit', 'payments', "Menolak pembayaran #$pcId (order {$pc['order_id']})");
         }

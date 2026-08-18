@@ -10,6 +10,11 @@ require_once '../config/rbac.php'; // untuk isLoggedIn()
 
 $conn = getConnection();
 ensureMidtransSchema();
+// Pastikan kolom stock_deducted tersedia SEBELUM transaksi dimulai
+// (ALTER TABLE yang self-healing tidak boleh dijalankan di dalam transaksi).
+if (function_exists('ensureStockDeductedColumn')) {
+    ensureStockDeductedColumn();
+}
 
 // ============================================
 // WAJIB LOGIN UNTUK MEMESAN
@@ -300,6 +305,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$conn->query($itemSql)) {
                     throw new Exception('Gagal menyimpan item pesanan: ' . $conn->error);
                 }
+            }
+
+            // Kurangi stok produk (global + stok cabang) — reserve stok saat pesanan dibuat.
+            // Idempoten: dipanggil sekali saja lewat kolom stock_deducted.
+            // Gagal mengurasi stok TIDAK menggagalkan pesanan (stok bisa disesuaikan manual).
+            if (function_exists('deductOrderStock')) {
+                deductOrderStock($orderId);
             }
 
             // Clear cart

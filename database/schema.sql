@@ -185,6 +185,7 @@ CREATE TABLE IF NOT EXISTS orders (
     payment_status ENUM('pending', 'paid', 'failed', 'refunded') DEFAULT 'pending',
     sold_counted TINYINT(1) NOT NULL DEFAULT 0,
     points_awarded TINYINT(1) NOT NULL DEFAULT 0,
+    stock_deducted TINYINT(1) NOT NULL DEFAULT 0,
     midtrans_transaction_id VARCHAR(100) NULL,
     midtrans_payment_type VARCHAR(50) NULL,
     midtrans_va_number VARCHAR(64) NULL,

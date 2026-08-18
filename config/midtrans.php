@@ -297,6 +297,7 @@ function midtransApplyTransactionStatus($order, $data) {
             WHERE id = $orderId");
         if ($ok) {
             countOrderSold($orderId); // sinkron total_sold produk (idempoten)
+            deductOrderStock($orderId); // pastikan stok ter-reserve (idempoten; menutup order lama yg belum pernah dikurangi)
             activateMembershipForOrder($orderId); // aktifkan langganan membership bila pesanan berisi paket
             // Poin & total belanja HANYA diberikan saat pembayaran LUNAS (idempoten, sekali saja)
             if (!empty($order['user_id'])) {
@@ -329,6 +330,7 @@ function midtransApplyTransactionStatus($order, $data) {
                 reverseOrderRewards((int)$order['user_id'], $order['subtotal'], $order['order_number'], $orderId);
             }
         }
+        restoreOrderStock($orderId); // kembalikan stok yang di-reserve saat order dibuat
         refundPointsForOrder($orderId); // kembalikan poin yang ditukar jadi diskon
         $ok = $conn->query("UPDATE orders SET
                 payment_status = 'failed',
@@ -362,6 +364,7 @@ function midtransApplyTransactionStatus($order, $data) {
             }
             cancelMembershipForOrder($orderId);
         }
+        restoreOrderStock($orderId); // kembalikan stok yang di-reserve saat order dibuat
         refundPointsForOrder($orderId); // kembalikan poin yang ditukar jadi diskon
         $ok = $conn->query("UPDATE orders SET
                 payment_status = 'refunded',

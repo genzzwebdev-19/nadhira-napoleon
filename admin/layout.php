@@ -77,6 +77,11 @@ $conn = getConnection();
 require_once __DIR__ . '/../includes/backup-helper.php';
 runAutoBackupIfDue(false);
 
+// Auto-expire pesanan pending yang tidak dibayar (poor man's cron — ringan, throttle 1x/jam)
+if (function_exists('runOrderExpiryIfDue')) {
+    runOrderExpiryIfDue();
+}
+
 $navBadges = [];
 if ($conn) {
     if (hasPermission('messages', 'view')) {
