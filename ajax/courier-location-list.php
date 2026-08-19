@@ -4,9 +4,16 @@
 // Dipakai halaman admin/couriers.php untuk
 // menyegarkan posisi kurir di peta secara berkala.
 // ============================================
-require_once '../config/database.php';
+require_once '../config/rbac.php';
 
 header('Content-Type: application/json');
+
+// Hanya admin yang login — endpoint ini membocorkan posisi GPS semua kurir (privasi staf)
+if (!isLoggedIn() || !isAdminUser()) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'error' => 'unauthorized']);
+    exit;
+}
 
 $conn = getConnection();
 $couriers = [];

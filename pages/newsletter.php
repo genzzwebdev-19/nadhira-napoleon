@@ -14,7 +14,10 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
 
-    if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    // Batas langganan per IP (anti polusi daftar subscriber)
+    if (function_exists('rateLimitIp') && !rateLimitIp('newsletter', 10, 3600)) {
+        $error = 'Terlalu banyak permintaan. Silakan coba lagi nanti.';
+    } elseif (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Format email tidak valid';
     } else {
         $conn = getConnection();

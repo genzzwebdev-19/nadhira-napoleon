@@ -28,7 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings']) && !
         }
         $ext = strtolower(pathinfo($_FILES['story_image']['name'], PATHINFO_EXTENSION));
         $allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-        if (in_array($ext, $allowedExts)) {
+        $storyImgOk = @getimagesize($_FILES['story_image']['tmp_name']); // pastikan isi file gambar
+        if (in_array($ext, $allowedExts) && $storyImgOk) {
             // Foto story lama (untuk dibersihkan saat diganti)
             $oldStory = '';
             $oldSQ = $conn->query("SELECT setting_value FROM settings WHERE setting_key = 'story_image' LIMIT 1");

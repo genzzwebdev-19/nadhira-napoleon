@@ -15,8 +15,9 @@ define('DB_PORT', '3306');
 //    - Isi dengan nilai acak (mis. 'x9f2Kp7QzL') => browser butuh ?key=x9f2Kp7QzL.
 if (!defined('INSTALL_KEY')) {
     // 🔑 Kunci installer database — ganti nilai ini dengan acak & rahasia!
-    // Contoh dari generator: 'Zk9pT2nVx7Lq4mRa'
-    define('INSTALL_KEY', 'Zk9pT2nVx7Lq4mRa');
+    // Catatan keamanan: nilai di repo ini BUKAN untuk produksi — file config/database.php
+    // di server dikelola manual (lihat DEPLOY.md) dan harus memakai kunci acak sendiri.
+    define('INSTALL_KEY', 'Xr7mKp4Qw2Zt9LvB');
 }
 
 // ============================================
@@ -48,7 +49,11 @@ define('UPLOADS_URL', SITE_URL . '/uploads');
 // ============================================
 ini_set('session.cookie_httponly', 1);
 ini_set('session.use_only_cookies', 1);
-ini_set('session.cookie_secure', 0); // Set to 1 if using HTTPS
+// SameSite=Lax: cookie sesi tidak dikirim pada permintaan lintas-situs (perlindungan CSRF dasar
+// untuk endpoint AJAX/POST yang tidak memakai token eksplisit).
+ini_set('session.cookie_samesite', 'Lax');
+// Secure otomatis bila halaman diakses via HTTPS (produksi).
+ini_set('session.cookie_secure', (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 1 : 0);
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -470,6 +475,56 @@ function jsonResponse($data, $statusCode = 200) {
     header('Content-Type: application/json');
     echo json_encode($data);
     exit;
+}
+
+// ============================================
+// RATE LIMITING SEDERHANA (anti-spam / anti-bruteforce)
+// ============================================
+// Menyimpan counter pemakaian per kunci (mis. IP) di tabel rate_limits.
+// Dipakai form kontak, newsletter, registrasi, reset password, konfirmasi
+// pembayaran, dan login — area yang sebelumnya tanpa batas.
+
+function ensureRateLimitSchema() {
+    static $done = false;
+    if ($done) return true;
+    $conn = getConnection();
+    if (!$conn) return false;
+    $done = true;
+    return $conn->query("CREATE TABLE IF NOT EXISTS rate_limits (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        rkey VARCHAR(120) NOT NULL,
+        hit_count INT NOT NULL DEFAULT 1,
+        window_start DATETIME NOT NULL,
+        UNIQUE KEY uk_rkey (rkey)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
+// Cek & catat pemakaian. TRUE = masih diizinkan, FALSE = melebihi batas (harus ditolak).
+function rateLimitAllow($key, $max, $windowSeconds = 3600) {
+    ensureRateLimitSchema();
+    $conn = getConnection();
+    if (!$conn) return true; // DB bermasalah -> fail-open agar situs tetap berfungsi
+    $key = $conn->real_escape_string(substr((string)$key, 0, 120));
+    $max = max(1, (int)$max);
+    $windowSeconds = max(1, (int)$windowSeconds);
+    $now = date('Y-m-d H:i:s');
+    $windowStart = date('Y-m-d H:i:s', time() - $windowSeconds);
+
+    $conn->query("INSERT INTO rate_limits (rkey, hit_count, window_start) VALUES ('$key', 1, '$now')
+                  ON DUPLICATE KEY UPDATE
+                    hit_count = IF(window_start < '$windowStart', 1, hit_count + 1),
+                    window_start = IF(window_start < '$windowStart', '$now', window_start)");
+    $r = $conn->query("SELECT hit_count FROM rate_limits WHERE rkey = '$key' LIMIT 1");
+    if ($r && $r->num_rows > 0) {
+        return (int)$r->fetch_assoc()['hit_count'] <= $max;
+    }
+    return true;
+}
+
+// Variasi berbasis IP (paling umum dipakai).
+function rateLimitIp($area, $max, $windowSeconds = 3600) {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    return rateLimitAllow('rl:' . $area . ':' . $ip, $max, $windowSeconds);
 }
 
 // ============================================

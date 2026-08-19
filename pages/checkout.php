@@ -43,6 +43,11 @@ $pointsDiscount = 0;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $errors = [];
 
+    // Keamanan: buat order hanya dari form yang punya token CSRF (cegah order siluman)
+    if (!verifyCsrf()) {
+        $errors[] = 'Sesi berakhir. Muat ulang halaman dan coba lagi.';
+    }
+
     // Get and validate form data
     $customerName    = trim($_POST['customer_name'] ?? '');
     $customerPhone   = trim($_POST['customer_phone'] ?? '');
@@ -560,6 +565,7 @@ include '../includes/header.php';
             <!-- Checkout Form -->
             <div>
                 <form method="POST" action="" id="checkout-form">
+                    <?= csrfField() ?>
                     <!-- Shipping Information -->
                     <div class="checkout-card">
                         <h3 style="font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 600; margin-bottom: var(--space-xl);">

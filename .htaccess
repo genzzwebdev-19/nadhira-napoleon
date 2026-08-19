@@ -13,6 +13,12 @@ RewriteEngine On
     Header set X-Frame-Options "SAMEORIGIN"
     Header set X-XSS-Protection "1; mode=block"
     Header set Referrer-Policy "strict-origin-when-cross-origin"
+    # HSTS — hanya berlaku saat situs diakses via HTTPS (browser mengabaikannya di HTTP)
+    Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    Header set Permissions-Policy "camera=(self), geolocation=(self), microphone=(), payment=()"
+    # CSP: inline script/style tetap diizinkan (situs memakai banyak inline),
+    # sumber eksternal di-whitelist (CDN font-awesome + GSAP, Google Fonts, Midtrans, YouTube/IG, Cloudinary)
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://app.sandbox.midtrans.com https://app.midtrans.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; connect-src 'self' https:; media-src 'self' https:; frame-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://www.youtube.com https://www.instagram.com; object-src 'none'; base-uri 'self'; form-action 'self' https:;"
 </IfModule>
 
 # ============================================
@@ -28,6 +34,21 @@ Options -Indexes
 </FilesMatch>
 
 # Folder uploads/backups & uploads/payments dilindungi oleh .htaccess-nya sendiri
+
+# ============================================
+# PHP INFORMATION DISCLOSURE (best effort)
+# ============================================
+<IfModule mod_php.c>
+    php_flag expose_php Off
+    php_flag display_errors Off
+</IfModule>
+
+# ============================================
+# BLOCK GIT / VCS METADATA EXPOSURE
+# ============================================
+# Mencegah .git (riwayat & source code) diunduh publik bila folder repo
+# ikut ter-upload ke hosting.
+RewriteRule (^|/)\.git(/|$) - [F,L]
 
 # ============================================
 # PROTECT APPLICATION INTERNALS (config, includes)

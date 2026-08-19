@@ -99,19 +99,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_address'])) {
     }
 }
 
-// Hapus alamat
-if (isset($_GET['delete_address'])) {
-    if (deleteShippingAddress((int)$_GET['delete_address'], (int)$user['id'])) {
+// Hapus alamat (POST + CSRF — aksi tulis tidak boleh via GET)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_address'])) {
+    verifyCsrf();
+    if (deleteShippingAddress((int)$_POST['delete_address'], (int)$user['id'])) {
         $success = 'Alamat pengiriman dihapus.';
     }
     header('Location: ' . BASE_PATH . '/auth/profile.php');
     exit;
 }
 
-// Jadikan alamat default
-if (isset($_GET['set_default_address'])) {
+// Jadikan alamat default (POST + CSRF)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_default_address'])) {
+    verifyCsrf();
     $conn->query("UPDATE shipping_addresses SET is_default = 0 WHERE user_id = " . (int)$user['id']);
-    $conn->query("UPDATE shipping_addresses SET is_default = 1 WHERE id = " . (int)$_GET['set_default_address'] . " AND user_id = " . (int)$user['id']);
+    $conn->query("UPDATE shipping_addresses SET is_default = 1 WHERE id = " . (int)$_POST['set_default_address'] . " AND user_id = " . (int)$user['id']);
     header('Location: ' . BASE_PATH . '/auth/profile.php');
     exit;
 }
@@ -436,16 +438,24 @@ include '../includes/header.php';
                             </p>
                             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                                 <?php if (!$ad['is_default']): ?>
-                                <a href="?set_default_address=<?= (int)$ad['id'] ?>" class="btn btn-outline btn-sm" title="Jadikan alamat default">
-                                    <i class="fas fa-star"></i> Default
-                                </a>
+                                <form method="POST" action="" style="display: inline;">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="set_default_address" value="<?= (int)$ad['id'] ?>">
+                                    <button type="submit" class="btn btn-outline btn-sm" title="Jadikan alamat default">
+                                        <i class="fas fa-star"></i> Default
+                                    </button>
+                                </form>
                                 <?php endif; ?>
                                 <a href="?edit_address=<?= (int)$ad['id'] ?>" class="btn btn-outline btn-sm" title="Edit alamat">
                                     <i class="fas fa-edit"></i> Edit
                                 </a>
-                                <a href="?delete_address=<?= (int)$ad['id'] ?>" class="btn btn-outline btn-sm" style="color: #DC2626; border-color: #fecaca;" onclick="return confirm('Hapus alamat ini?')" title="Hapus alamat">
-                                    <i class="fas fa-trash"></i>
-                                </a>
+                                <form method="POST" action="" style="display: inline;" onsubmit="return confirm('Hapus alamat ini?')">
+                                    <?= csrfField() ?>
+                                    <input type="hidden" name="delete_address" value="<?= (int)$ad['id'] ?>">
+                                    <button type="submit" class="btn btn-outline btn-sm" style="color: #DC2626; border-color: #fecaca;" title="Hapus alamat">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
                             </div>
                         </div>
                         <?php endforeach; ?>

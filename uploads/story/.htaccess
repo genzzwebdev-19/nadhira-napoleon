@@ -1,0 +1,5 @@
+# Cegah eksekusi file skrip di folder upload (gambar tetap bisa disajikan normal)
+<FilesMatch "\.(?i:php|phtml|php3|php4|php5|php7|phar|pl|py|cgi|sh)$">
+    Require all denied
+</FilesMatch>
+Options -Indexes

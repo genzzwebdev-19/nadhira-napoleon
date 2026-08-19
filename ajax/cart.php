@@ -46,7 +46,14 @@ switch ($action) {
             jsonResponse(['success' => false, 'message' => 'Koneksi database gagal']);
         }
         
-        $conn->query("UPDATE carts SET quantity = $quantity WHERE id = $cartId");
+        // Hanya boleh mengubah item keranjang MILIK SENDIRI (cegah IDOR)
+        $where = isLoggedIn()
+            ? 'user_id = ' . (int)$_SESSION['user_id']
+            : "session_id = '" . $conn->real_escape_string(session_id()) . "'";
+        $conn->query("UPDATE carts SET quantity = $quantity WHERE id = $cartId AND $where");
+        if ($conn->affected_rows === 0) {
+            jsonResponse(['success' => false, 'message' => 'Item keranjang tidak ditemukan']);
+        }
         jsonResponse(['success' => true, 'cart_count' => getCartCount()]);
         break;
 
@@ -58,7 +65,14 @@ switch ($action) {
             jsonResponse(['success' => false, 'message' => 'Koneksi database gagal']);
         }
         
-        $conn->query("DELETE FROM carts WHERE id = $cartId");
+        // Hanya boleh menghapus item keranjang MILIK SENDIRI (cegah IDOR)
+        $where = isLoggedIn()
+            ? 'user_id = ' . (int)$_SESSION['user_id']
+            : "session_id = '" . $conn->real_escape_string(session_id()) . "'";
+        $conn->query("DELETE FROM carts WHERE id = $cartId AND $where");
+        if ($conn->affected_rows === 0) {
+            jsonResponse(['success' => false, 'message' => 'Item keranjang tidak ditemukan']);
+        }
         jsonResponse(['success' => true, 'cart_count' => getCartCount()]);
         break;
 

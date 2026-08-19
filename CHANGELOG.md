@@ -5,6 +5,51 @@
 
 ---
 
+## [1.24.0] — 2026-08-18
+
+### 🛡️ Hardening Keamanan (hasil Security Audit)
+
+Hasil audit keamanan (code review + tes aktif aman di localhost) — 15 temuan ditangani. Fondasi sudah kuat (bcrypt, CSRF admin, escaping SQL, verifikasi webhook Midtrans); perbaikan fokus pada kontrol akses, CSRF, rate limiting, dan header keamanan.
+
+#### 🔐 Kontrol Akses (IDOR & Privasi)
+- **`ajax/cart.php`**: update & hapus item keranjang kini **wajib milik sendiri** (`user_id` / `session_id` ikut dikunci) — sebelumnya siapa pun yang tahu ID keranjang bisa mengubah/hapus keranjang orang lain
+- **`ajax/courier-location-list.php`**: kini **wajib login admin** — sebelumnya posisi GPS semua kurir bisa dipoll siapa pun
+- **`ajax/courier-location-get.php`**: posisi kurir hanya bisa diakses admin, **pemilik pesanan** (order_number + email cocok), atau user login pemilik pesanan — konteks order dikirim dari `pages/tracking.php`
+- **`pages/tracking.php`**: melihat detail pesanan kini **wajib email pemesan cocok ATAU login sebagai pemilik** — sebelumnya nomor pesanan yang bisa ditebak cukup untuk membuka nama/alamat/telepon orang lain
+- **`pages/payment-confirm.php`**: konfirmasi pembayaran kini **wajib login + pesanan milik akun** (ID/email cocok) — sebelumnya siapa pun yang tahu nomor pesanan bisa mengirim konfirmasi palsu
+
+#### 🔑 CSRF Lengkap
+- **`pages/checkout.php`**: buat order kini butuh token CSRF (form + verifikasi server)
+- **`pages/payment-confirm.php`**: token CSRF ditambahkan
+- **`admin/import-gdrive-images.php`**: aksi "Hapus Gambar Unsplash" diubah dari GET menjadi **POST + CSRF**
+- Endpoint AJAX keranjang/wishlist terlindungi `SameSite=Lax` (lihat Cookie & Sesi)
+
+#### 🚦 Rate Limiting (anti-spam / anti-bruteforce)
+- Helper baru di `config/database.php`: tabel `rate_limits` (self-healing) + `rateLimitAllow()` / `rateLimitIp()`
+- **Login**: maks 20 percobaan per IP per 15 menit (melengkapi lockout per-akun)
+- **Pesan anti-enumerasi**: semua pesan gagal login diseragamkan menjadi *"Email atau password salah"* — akun yang dinonaktifkan/dikunci/terlalu banyak percobaan tidak lagi membocorkan keberadaan akun
+- **Register**: maks 5/IP/jam · **Contact form**: 5/IP/jam · **Newsletter**: 10/IP/jam · **Forgot password**: 5/IP/jam + 3/email/jam (anti spam email & hemat kuota SMTP) · **Konfirmasi pembayaran**: 3/IP/jam
+
+#### 🌐 Cookie, Sesi & Header
+- Cookie sesi PHP: **`SameSite=Lax`** (CSRF dasar untuk AJAX) + `Secure` otomatis saat HTTPS
+- `.htaccess`: blokir **`.git`** (riwayat/source tidak bisa diunduh), tambah **CSP** (whitelist CDN FontAwesome, Google Fonts, Midtrans, YouTube/Instagram, Cloudinary), **HSTS**, dan **Permissions-Policy**
+- Upload: `getimagesize()` untuk gambar produk & story (bukan sekadar ekstensi/MIME client), nama file bukti bayar disanitasi, dan `.htaccess` anti-eksekusi PHP di `uploads/products|story|hero|branches`
+
+#### 🔑 Lain-lain
+- `INSTALL_KEY` (kunci installer DB) dirotasi — catatan: versi produksi `config/database.php` dikelola manual (DEPLOY.md) dan harus memakai kunci acak sendiri
+
+#### 🔍 Putaran kedua (area yang tersisa)
+- **`auth/profile.php`**: hapus & jadikan-default alamat diubah dari GET menjadi **POST + CSRF** (GET + SameSite=Lax masih bisa disalahgunakan via navigasi top-level)
+- **`pages/wishlist.php`**: aksi hapus & tambah-semua-ke-keranjang kini **POST + CSRF**
+- **`pages/product-detail.php`**: form ulasan kini butuh **CSRF**
+- **`pages/invoice.php` & `pages/download-invoice-pdf.php`**: cek akses admin memakai `isAdminUser()` (RBAC) — sebelumnya cek kolom `role='admin'` lama sehingga admin RBAC tidak bisa membuka invoice dari panel
+- **`ajax/midtrans-status.php`**: rate limit polling (20/5 menit per IP) agar API Midtrans tidak dipanggil berulang
+- **`config/otp.php`**: kunci HMAC OTP bisa diatur dari Pengaturan (`wa_otp_hmac_key`), fallback ke nilai lama
+- **`.htaccess`**: `expose_php Off` + `display_errors Off` (best effort, mod_php)
+- **`composer audit`**: dependensi (dompdf, phpmailer) bersih dari advisories yang diketahui
+
+---
+
 ## [1.23.0] — 2026-08-17
 
 ### 📦 Stok Otomatis Sinkron dengan Pesanan

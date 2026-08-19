@@ -14,7 +14,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone = trim($_POST['phone'] ?? '');
     $message = trim($_POST['message'] ?? '');
 
-    if (empty($name) || empty($email) || empty($message)) {
+    // Batas pengiriman pesan per IP (anti spam form kontak)
+    if (function_exists('rateLimitIp') && !rateLimitIp('contact', 5, 3600)) {
+        $error = 'Terlalu banyak pesan dikirim dari alamat ini. Silakan coba lagi nanti.';
+    } elseif (empty($name) || empty($email) || empty($message)) {
         $error = 'Mohon isi nama, email, dan pesan';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Format email tidak valid';

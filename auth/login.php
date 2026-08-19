@@ -42,6 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($email) || empty($password)) {
         $error = 'Silakan isi email dan password';
+    } elseif (function_exists('rateLimitIp') && !rateLimitIp('login', 20, 900)) {
+        // Batas percobaan per IP (15 menit) — anti bruteforce lintas akun
+        $error = 'Terlalu banyak percobaan masuk. Silakan coba lagi nanti.';
     } else {
         $conn = getConnection();
         if ($conn) {
@@ -55,18 +58,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // 1. Cek akun nonaktif (suspend)
                 if (!(int)$user['is_active']) {
                     logLoginAttempt($uid, $email, false);
-                    $error = 'Akun Anda dinonaktifkan. Hubungi administrator.';
+                    $error = 'Email atau password salah.';
                 }
                 // 2. Cek akun dikunci permanen
                 elseif ((int)$user['is_locked']) {
                     logLoginAttempt($uid, $email, false);
-                    $error = 'Akun Anda dikunci. Hubungi administrator.';
+                    $error = 'Email atau password salah.';
                 }
                 // 3. Cek lock sementara (terlalu banyak gagal login)
                 elseif (!empty($user['locked_until']) && strtotime($user['locked_until']) > time()) {
-                    $mins = ceil((strtotime($user['locked_until']) - time()) / 60);
                     logLoginAttempt($uid, $email, false);
-                    $error = "Terlalu banyak percobaan gagal. Akun dikunci sementara. Coba lagi dalam {$mins} menit.";
+                    $error = 'Email atau password salah.';
                 }
                 // 4. Verifikasi password
                 elseif (!password_verify($password, $user['password'])) {
@@ -74,12 +76,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($newAttempts >= RBAC_MAX_FAILED_ATTEMPTS) {
                         $lockUntil = date('Y-m-d H:i:s', time() + RBAC_LOCK_MINUTES * 60);
                         $conn->query("UPDATE users SET failed_attempts = $newAttempts, locked_until = '$lockUntil' WHERE id = $uid");
-                        $error = 'Terlalu banyak percobaan gagal. Akun dikunci selama ' . RBAC_LOCK_MINUTES . ' menit.';
                     } else {
                         $conn->query("UPDATE users SET failed_attempts = $newAttempts WHERE id = $uid");
-                        $error = 'Email atau password salah. Sisa percobaan: ' . (RBAC_MAX_FAILED_ATTEMPTS - $newAttempts);
                     }
                     logLoginAttempt($uid, $email, false);
+                    // Pesan seragam untuk semua kegagalan — cegah enumerasi akun (OWASP)
+                    $error = 'Email atau password salah.';
                 }
                 // 5. Berhasil login
                 else {

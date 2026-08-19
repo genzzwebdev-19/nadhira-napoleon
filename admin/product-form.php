@@ -188,8 +188,9 @@ if (isset($_FILES['product_images']) && $productId > 0) {
         $origName = $files['name'][$i];
         $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
         $allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+        $imgInfo = @getimagesize($tmpName); // pastikan isi file benar-benar gambar
         
-        if (!in_array($ext, $allowedExts)) continue;
+        if (!in_array($ext, $allowedExts) || !$imgInfo) continue;
         
         $filename = 'product_' . $productId . '_' . time() . '_' . $i . '.' . $ext;
         $destPath = $uploadDir . $filename;

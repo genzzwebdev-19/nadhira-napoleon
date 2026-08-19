@@ -36,8 +36,8 @@ $payFlag = trim($_GET['pay'] ?? '');
 // Access control
 $accessDenied = true;
 if ($isAdmin && isLoggedIn()) {
-    $user = getCurrentUser();
-    if ($user && $user['role'] === 'admin') {
+    // Admin RBAC (super admin & semua role admin) — bukan cek kolom role lama
+    if (isAdminUser()) {
         $accessDenied = false;
     }
 }

@@ -5,6 +5,7 @@
 // Website Nadhira Napoleon Pekanbaru
 // ============================================
 require_once '../config/database.php';
+require_once __DIR__ . '/../config/rbac.php';      // isLoggedIn/getCurrentUser/verifyCsrf — keamanan konfirmasi
 require_once __DIR__ . '/../config/cloudinary.php'; // penyimpanan bukti transfer ke Cloudinary
 
 $page_title = 'Konfirmasi Pembayaran';
@@ -18,6 +19,18 @@ $success = '';
 // HANDLE FORM SUBMISSION
 // ============================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_confirmation'])) {
+    // Keamanan: wajib login (semua pesanan baru memang dari akun), token CSRF,
+    // dan batas kirim per IP agar form tidak disalahgunakan (spam/konfirmasi palsu).
+    if (!isLoggedIn()) {
+        $errors[] = 'Silakan login terlebih dahulu untuk konfirmasi pembayaran.';
+    }
+    if (empty($errors) && !verifyCsrf()) {
+        $errors[] = 'Sesi berakhir. Muat ulang halaman dan coba lagi.';
+    }
+    if (empty($errors) && function_exists('rateLimitIp') && !rateLimitIp('pay-confirm', 3, 3600)) {
+        $errors[] = 'Terlalu banyak konfirmasi dikirim. Silakan coba lagi nanti.';
+    }
+
     $orderNumber = trim($_POST['order_number'] ?? '');
     $bankName = trim($_POST['bank_name'] ?? '');
     $accountNumber = trim($_POST['account_number'] ?? '');
@@ -46,7 +59,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_confirmation']
             $errors[] = 'Nomor pesanan tidak ditemukan. Periksa kembali nomor pesanan Anda.';
         } else {
             $order = $orderResult->fetch_assoc();
-            
+
+            // Kepemilikan: pesanan harus milik akun yang login (ID atau email cocok)
+            $me = getCurrentUser();
+            if ($me
+                && (int)$me['id'] !== (int)$order['user_id']
+                && strtolower((string)$me['email']) !== strtolower((string)$order['customer_email'])) {
+                $errors[] = 'Pesanan ini bukan milik akun Anda. Periksa kembali nomor pesanan.';
+            }
+
             // Check if already paid
             if ($order['payment_status'] === 'paid') {
                 $errors[] = 'Pesanan ini sudah dibayar. Jika ada kendala, silakan hubungi kami.';
@@ -70,15 +91,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_confirmation']
     if (empty($errors) && isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] === UPLOAD_ERR_OK) {
         $file = $_FILES['proof_image'];
         $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
+        $allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $maxSize = 5 * 1024 * 1024; // 5MB
-        
-        if (!in_array($file['type'], $allowedTypes)) {
-            $errors[] = 'Format file harus JPG, PNG, GIF, atau WebP';
+        $extension = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));
+        $imgInfo = @getimagesize($file['tmp_name']); // validasi isi file (bukan sekadar MIME dari client)
+
+        if (!in_array($extension, $allowedExts, true) || !$imgInfo) {
+            $errors[] = 'Format file harus JPG, PNG, GIF, atau WebP yang valid';
         } elseif ($file['size'] > $maxSize) {
             $errors[] = 'Ukuran file maksimal 5MB';
         } else {
-            $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-            $fileName = 'payment_' . $orderNumber . '_' . time() . '.' . $extension;
+            // Nama file aman: hanya karakter alfanumerik & strip (nomor pesanan dibersihkan)
+            $safeOrder = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$orderNumber);
+            $fileName = 'payment_' . ($safeOrder !== '' ? $safeOrder : 'order') . '_' . time() . '.' . $extension;
             $uploadPath = __DIR__ . '/../uploads/payments/' . $fileName;
             
             $uploaded = false;
@@ -210,6 +235,7 @@ include '../includes/header.php';
 
             <form method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="submit_confirmation" value="1">
+                <?= csrfField() ?>
 
                 <!-- Order Number -->
                 <div class="form-group">

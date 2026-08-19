@@ -13,6 +13,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Silakan isi email Anda';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Format email tidak valid';
+    } elseif ((function_exists('rateLimitIp') && !rateLimitIp('forgot', 5, 3600))
+              || (function_exists('rateLimitAllow') && !rateLimitAllow('forgot-email:' . strtolower($email), 3, 3600))) {
+        // Batas permintaan reset per IP & per email (anti spam email / pemakaian kuota SMTP)
+        $error = 'Terlalu banyak permintaan reset password. Silakan coba lagi nanti.';
     } else {
         $res = sendPasswordResetEmail($email);
         if ($res['ok']) {

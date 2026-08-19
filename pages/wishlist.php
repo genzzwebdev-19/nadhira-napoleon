@@ -4,6 +4,7 @@
 // Produk favorit customer yang sudah login
 // ============================================
 require_once '../config/database.php';
+require_once '../config/rbac.php'; // verifyCsrf/csrfField untuk aksi wishlist
 
 if (!isLoggedIn()) {
     header('Location: ' . SITE_URL . '/auth/login.php');
@@ -16,15 +17,17 @@ $meta_description = 'Produk favorit Anda di Nadhira Napoleon Pekanbaru.';
 
 $conn = getConnection();
 
-// Handle remove from wishlist
+// Handle remove from wishlist (POST + CSRF)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['remove'])) {
+    verifyCsrf();
     $productId = (int)$_POST['product_id'];
     $conn->query("DELETE FROM wishlists WHERE user_id = $userId AND product_id = $productId");
     $removed = true;
 }
 
-// Handle add all to cart
+// Handle add all to cart (POST + CSRF)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_all_to_cart'])) {
+    verifyCsrf();
     $wishlistItems = $conn->query("SELECT product_id FROM wishlists WHERE user_id = $userId");
     if ($wishlistItems) {
         while ($item = $wishlistItems->fetch_assoc()) {
@@ -95,6 +98,7 @@ include '../includes/header.php';
             <div style="display: flex; gap: var(--space-md);">
                 <?php if ($totalWishlist > 0): ?>
                 <form method="POST" onsubmit="return confirm('Tambahkan semua produk ke keranjang?')">
+                    <?= csrfField() ?>
                     <button type="submit" name="add_all_to_cart" class="btn btn-primary">
                         <i class="fas fa-shopping-bag"></i>
                         Tambah Semua ke Keranjang
@@ -139,6 +143,7 @@ include '../includes/header.php';
                              loading="lazy">
                         <div class="product-card-actions">
                             <form method="POST" style="display: inline;">
+                                <?= csrfField() ?>
                                 <input type="hidden" name="product_id" value="<?= $item['product_id'] ?>">
                                 <button type="submit" name="remove" class="product-card-action" 
                                         onclick="return confirm('Hapus <?= htmlspecialchars($item['name']) ?> dari wishlist?')"
@@ -186,6 +191,7 @@ include '../includes/header.php';
             <!-- Bottom Actions -->
             <div style="text-align: center; margin-top: var(--space-3xl); display: flex; justify-content: center; gap: var(--space-md); flex-wrap: wrap;">
                 <form method="POST" onsubmit="return confirm('Tambahkan semua produk ke keranjang?')">
+                    <?= csrfField() ?>
                     <button type="submit" name="add_all_to_cart" class="btn btn-primary btn-lg">
                         <i class="fas fa-shopping-bag"></i>
                         Tambah Semua ke Keranjang (<?= $totalWishlist ?> produk)

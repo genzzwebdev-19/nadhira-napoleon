@@ -5,6 +5,7 @@
 // Website Nadhira Napoleon Pekanbaru
 // ============================================
 require_once '../config/database.php';
+require_once '../config/rbac.php'; // verifyCsrf/csrfField untuk form ulasan
 
 $conn = getConnection();
 $productId = (int)($_GET['id'] ?? 0);
@@ -76,6 +77,8 @@ if (isLoggedIn()) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_review'])) {
     if (!isLoggedIn()) {
         $reviewError = 'Silakan login terlebih dahulu untuk menulis ulasan.';
+    } elseif (!verifyCsrf()) {
+        $reviewError = 'Sesi berakhir. Muat ulang halaman dan coba lagi.';
     } else {
         $uid = (int)$_SESSION['user_id'];
         $rating = (int)($_POST['rating'] ?? 0);
@@ -363,6 +366,7 @@ $stockClass = $product['stock'] > 5 ? '#10B981' : ($product['stock'] > 0 ? '#D97
                             <h4 style="font-family: var(--font-display); font-weight: 600; margin-bottom: var(--space-sm);">✍️ Tulis Ulasan Anda</h4>
                             <form method="POST" action="">
                                 <input type="hidden" name="submit_review" value="1">
+                                <?= csrfField() ?>
                                 <div style="margin-bottom: var(--space-sm);">
                                     <label style="font-size: var(--text-sm); font-weight: 600; display: block; margin-bottom: 6px;">Rating</label>
                                     <div class="review-stars-input" style="display: flex; gap: 6px; font-size: 26px; cursor: pointer;">

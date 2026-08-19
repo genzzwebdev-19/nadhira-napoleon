@@ -116,7 +116,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $confirmPassword = $_POST['confirm_password'] ?? '';
         $agree = isset($_POST['agree']);
 
-        if (empty($fullName) || empty($username) || empty($email) || empty($password)) {
+        // Batas pendaftaran per IP (anti spam akun)
+        if (function_exists('rateLimitIp') && !rateLimitIp('register', 5, 3600)) {
+            $error = 'Terlalu banyak pendaftaran dari alamat ini. Silakan coba lagi nanti.';
+        } elseif (empty($fullName) || empty($username) || empty($email) || empty($password)) {
             $error = 'Silakan isi semua field yang wajib diisi';
         } elseif ($password !== $confirmPassword) {
             $error = 'Konfirmasi password tidak cocok';

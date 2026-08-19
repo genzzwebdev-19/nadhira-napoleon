@@ -23,6 +23,11 @@ if (!$conn || $orderNumber === '') {
     jsonResponse(['success' => false, 'message' => 'Parameter tidak valid'], 400);
 }
 
+// Batas polling per IP — hindari pemanggilan berulang ke API Midtrans (pemakaian/ongkos)
+if (function_exists('rateLimitIp') && !rateLimitIp('midtrans-status', 20, 300)) {
+    jsonResponse(['success' => false, 'message' => 'Terlalu banyak permintaan. Coba lagi nanti.'], 429);
+}
+
 $orderNumber = $conn->real_escape_string($orderNumber);
 $r = $conn->query("SELECT * FROM orders WHERE order_number = '$orderNumber' LIMIT 1");
 if (!$r || $r->num_rows === 0) {

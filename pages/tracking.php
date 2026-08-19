@@ -30,25 +30,30 @@ if (isset($_GET['order_number']) || isset($_POST['order_number'])) {
         $conn = getConnection();
         if ($conn) {
             $orderNumber = $conn->real_escape_string($orderNumber);
-            
-            $query = "SELECT * FROM orders WHERE order_number = '$orderNumber'";
-            if (!empty($email)) {
-                $email = $conn->real_escape_string($email);
-                $query .= " AND customer_email = '$email'";
-            }
-            $query .= " LIMIT 1";
 
+            // Keamanan: data pesanan (nama, alamat, telepon) hanya boleh dilihat
+            // oleh pemilik — email pemesan HARUS cocok ATAU user login yang memilikinya.
+            // (Sebelumnya email opsional sehingga nomor pesanan yang bisa ditebak
+            //  cukup untuk membuka data pesanan orang lain.)
+            $query = "SELECT * FROM orders WHERE order_number = '$orderNumber' LIMIT 1";
             $result = $conn->query($query);
-            
+
             if ($result && $result->num_rows > 0) {
-                $order = $result->fetch_assoc();
-                
-                // Get order items
-                $itemsResult = $conn->query("SELECT * FROM order_items WHERE order_id = {$order['id']}");
-                if ($itemsResult) {
-                    while ($item = $itemsResult->fetch_assoc()) {
-                        $orderItems[] = $item;
+                $found = $result->fetch_assoc();
+                $emailMatch = $email !== '' && strtolower($email) === strtolower((string)$found['customer_email']);
+                $ownerMatch = isLoggedIn() && (int)$_SESSION['user_id'] === (int)$found['user_id'];
+                if ($emailMatch || $ownerMatch) {
+                    $order = $found;
+                    // Get order items
+                    $itemsResult = $conn->query("SELECT * FROM order_items WHERE order_id = {$order['id']}");
+                    if ($itemsResult) {
+                        while ($item = $itemsResult->fetch_assoc()) {
+                            $orderItems[] = $item;
+                        }
                     }
+                } else {
+                    $error = 'Pesanan dengan nomor "' . htmlspecialchars($orderNumber) . '" ditemukan, tetapi email yang dimasukkan tidak cocok.';
+                    $error .= ' Masukkan email pemesan atau masuk ke akun Anda untuk melihat pesanan.';
                 }
             } else {
                 $error = 'Pesanan dengan nomor "' . htmlspecialchars($orderNumber) . '" tidak ditemukan.';
@@ -502,7 +507,11 @@ include '../includes/header.php';
 
     var statusEl = document.getElementById('track-status');
     function poll() {
-        fetch('<?= SITE_URL ?>/ajax/courier-location-get.php?courier_id=' + cid)
+        // Konteks order (nomor + email) dikirim agar endpoint hanya membuka posisi
+        // kurir untuk pemilik pesanan yang sah — bukan untuk publik.
+        fetch('<?= SITE_URL ?>/ajax/courier-location-get.php?courier_id=' + cid
+              + '&order=' + encodeURIComponent('<?= htmlspecialchars($order['order_number'] ?? '') ?>')
+              + '&email=' + encodeURIComponent('<?= htmlspecialchars($email ?? '') ?>'))
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 if (d.ok) {

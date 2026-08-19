@@ -58,8 +58,9 @@ if ($action === 'update_db' && isset($_POST['product_id']) && isset($_POST['imag
     }
 }
 
-// Handle delete all Unsplash images
-if ($action === 'remove_unsplash') {
+// Handle delete all Unsplash images (kini POST + CSRF — aksi tulis tidak boleh via GET)
+if ($action === 'remove_unsplash' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrf();
     $conn->query("DELETE FROM product_images WHERE image LIKE '%unsplash%'");
     $msg = "✅ Semua gambar Unsplash telah dihapus!";
 }
@@ -377,9 +378,10 @@ $gdriveCategories = [
 
         <!-- Actions -->
         <div class="actions">
-            <a href="?action=remove_unsplash" class="btn btn-danger btn-sm" onclick="return confirm('Hapus SEMUA gambar Unsplash?')">
-                🗑️ Hapus Gambar Unsplash
-            </a>
+            <form method="POST" action="?action=remove_unsplash" style="display:inline;" onsubmit="return confirm('Hapus SEMUA gambar Unsplash?')">
+                <?= csrfField() ?>
+                <button type="submit" class="btn btn-danger btn-sm">🗑️ Hapus Gambar Unsplash</button>
+            </form>
             <a href="import-gdrive-images.php" class="btn btn-outline btn-sm">
                 🔄 Refresh
             </a>

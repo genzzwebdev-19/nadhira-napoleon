@@ -15,6 +15,10 @@
 /uploads/payments/*
 !/uploads/payments/.htaccess
 /uploads/story/*
+!/uploads/story/.htaccess
 /uploads/products/*
+!/uploads/products/.htaccess
 /uploads/hero/*
+!/uploads/hero/.htaccess
 /uploads/branches/*
+!/uploads/branches/.htaccess
