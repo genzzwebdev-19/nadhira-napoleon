@@ -42,6 +42,7 @@ $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_package'])) {
     $editId = (int)($_POST['edit_id'] ?? 0);
+    verifyCsrf();
     requirePermission('packages', $editId > 0 ? 'edit' : 'create');
 
     $name = trim($_POST['name'] ?? '');
@@ -249,6 +250,7 @@ if (isset($_GET['edit'])) {
         <?= $editPackage ? 'Edit Paket' : 'Tambah Paket Baru' ?>
     </h3>
     <form method="POST" enctype="multipart/form-data">
+        <?= csrfField() ?>
         <input type="hidden" name="save_package" value="1">
         <?php if ($editPackage): ?>
             <input type="hidden" name="edit_id" value="<?= (int)$editPackage['id'] ?>">

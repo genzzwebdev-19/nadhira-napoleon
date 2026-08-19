@@ -12,6 +12,7 @@ $success = '';
 
 // Handle actions BEFORE layout.php outputs HTML
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_testimonial'])) {
+    verifyCsrf();
     requirePermission('testimonials', (int)($_POST['id'] ?? 0) > 0 ? 'edit' : 'create');
     $name = trim($_POST['customer_name'] ?? '');
     $content = trim($_POST['content'] ?? '');
@@ -119,6 +120,7 @@ require_once __DIR__ . '/layout.php';
             <div class="admin-card">
                 <h3 class="admin-card-title">Tambah Testimoni Baru</h3>
                 <form method="POST">
+                    <?= csrfField() ?>
                     <input type="hidden" name="save_testimonial" value="1">
                     <div class="form-row">
                         <div class="form-group">
@@ -273,6 +275,7 @@ require_once __DIR__ . '/layout.php';
                         <button class="modal-close" onclick="document.getElementById('editModal').classList.remove('active')">&times;</button>
                     </div>                            <div class="modal-body">
                         <form method="POST">
+                            <?= csrfField() ?>
                             <input type="hidden" name="save_testimonial" value="1">
                             <input type="hidden" name="id" id="edit-id">
                             <input type="hidden" name="sort_order" id="edit-sort">

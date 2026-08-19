@@ -156,7 +156,7 @@ $logoWidth = (int)round($logoHeight * 446 / 448); // lebar proporsional (rasio a
     <nav class="navbar" role="navigation" aria-label="Navigasi utama">
         <div class="container">
             <a href="<?= SITE_URL ?>" class="navbar-brand">
-                <img src="<?= SITE_URL ?>/foto/images.jpg" alt="Nadhira Napoleon Logo" width="<?= $logoWidth ?>" height="<?= $logoHeight ?>" style="object-fit: contain; border-radius: 8px;">
+                <img src="<?= htmlspecialchars(getSetting('site_logo', SITE_URL . '/foto/images.jpg')) ?>" alt="Nadhira Napoleon Logo" width="<?= $logoWidth ?>" height="<?= $logoHeight ?>" style="object-fit: contain; border-radius: 8px;">
             </a>
 
             <div class="navbar-menu">

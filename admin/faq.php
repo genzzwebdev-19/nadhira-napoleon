@@ -12,6 +12,7 @@ $success = '';
 
 // Handle actions BEFORE layout.php outputs HTML
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_faq'])) {
+    verifyCsrf();
     requirePermission('faq', (int)($_POST['id'] ?? 0) > 0 ? 'edit' : 'create');
     $question = trim($_POST['question'] ?? '');
     $answer = trim($_POST['answer'] ?? '');
@@ -110,6 +111,7 @@ require_once __DIR__ . '/layout.php';
             <div class="admin-card">
                 <h3 class="admin-card-title">Tambah FAQ Baru</h3>
                 <form method="POST">
+                    <?= csrfField() ?>
                     <input type="hidden" name="save_faq" value="1">
                     <div class="form-row">
                         <div class="form-group" style="flex: 3;">
@@ -209,6 +211,7 @@ require_once __DIR__ . '/layout.php';
                     </div>
                     <div class="modal-body">
                         <form method="POST">
+                            <?= csrfField() ?>
                             <input type="hidden" name="save_faq" value="1">
                             <input type="hidden" name="id" id="edit-id">
                             <div class="form-row">

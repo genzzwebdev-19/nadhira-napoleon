@@ -20,6 +20,7 @@ $success = '';
 // (saat tombol "Kirim Email Uji" ditekan, handler simpan dilewati — ditangani khusus di bawah)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings']) && !isset($_POST['test_mail'])) {
     requirePermission('settings', 'settings');
+    verifyCsrf();
     // Handle story image upload FIRST
     if (isset($_FILES['story_image']) && $_FILES['story_image']['error'] === UPLOAD_ERR_OK) {
         $uploadDir = __DIR__ . '/../uploads/story/';
@@ -438,6 +439,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings']) && !
 // ============================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['test_mail'])) {
     requirePermission('settings', 'settings');
+    verifyCsrf();
     require_once __DIR__ . '/../config/mail.php';
 
     $testEmail = trim($_POST['test_email'] ?? '');
@@ -500,6 +502,7 @@ require_once __DIR__ . '/layout.php';
             <?php endforeach; ?>
 
             <form method="POST" enctype="multipart/form-data">
+                <?= csrfField() ?>
                 <input type="hidden" name="save_settings" value="1">
 
                 <!-- Informasi Toko -->

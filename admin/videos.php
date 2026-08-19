@@ -7,6 +7,7 @@ $conn = getConnection();
 
 // Handle POST - Add/Edit video
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrf();
     requirePermission('videos', (int)($_POST['edit_id'] ?? 0) > 0 ? 'edit' : 'create');
     $title = trim($_POST['title'] ?? '');
     $video_url = trim($_POST['video_url'] ?? '');
@@ -141,6 +142,7 @@ if (isset($_GET['main_ok'])) {
         <?= $editVideo ? 'Edit Video' : 'Tambah Video Baru' ?>
     </h3>
     <form method="POST">
+        <?= csrfField() ?>
         <?php if ($editVideo): ?>
             <input type="hidden" name="edit_id" value="<?= $editVideo['id'] ?>">
         <?php endif; ?>

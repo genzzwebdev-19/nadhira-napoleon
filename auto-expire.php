@@ -15,6 +15,7 @@
 // dan panel admin memanggil runOrderExpiryIfDue() yang throttle 1x/jam.
 // ============================================
 require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/includes/backup-helper.php';
 
 $isCli = php_sapi_name() === 'cli';
 

@@ -10,6 +10,7 @@ requirePermission('orders', 'view');
 // Handle status update (BEFORE layout.php outputs HTML)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     requirePermission('orders', 'edit');
+    verifyCsrf();
     $orderId = (int)$_POST['order_id'];
     $newStatus = $conn->real_escape_string($_POST['order_status']);
     $trackingNum = $conn->real_escape_string(trim($_POST['tracking_number'] ?? ''));
@@ -135,6 +136,7 @@ require_once __DIR__ . '/layout.php';
                                         </a>
                                         <form method="POST" style="display: inline-flex; gap: 4px; align-items: center;" 
                                               onsubmit="return confirm('Update status pesanan menjadi '+this.order_status.options[this.order_status.selectedIndex].text+'?')">
+                                            <?= csrfField() ?>
                                             <input type="hidden" name="order_id" value="<?= $o['id'] ?>">
                                             <input type="hidden" name="update_status" value="1">
                                             <select name="order_status" class="form-select" 

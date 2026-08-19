@@ -55,18 +55,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $user = $result->fetch_assoc();
                 $uid = (int)$user['id'];
 
-                // 1. Cek akun nonaktif (suspend)
-                if (!(int)$user['is_active']) {
-                    logLoginAttempt($uid, $email, false);
-                    $error = 'Email atau password salah.';
-                }
-                // 2. Cek akun dikunci permanen
-                elseif ((int)$user['is_locked']) {
-                    logLoginAttempt($uid, $email, false);
-                    $error = 'Email atau password salah.';
-                }
-                // 3. Cek lock sementara (terlalu banyak gagal login)
-                elseif (!empty($user['locked_until']) && strtotime($user['locked_until']) > time()) {
+                // Akun nonaktif, dikunci permanen, atau dikunci sementara
+                $blocked = !(int)$user['is_active']
+                    || (int)$user['is_locked']
+                    || (!empty($user['locked_until']) && strtotime($user['locked_until']) > time());
+                if ($blocked) {
                     logLoginAttempt($uid, $email, false);
                     $error = 'Email atau password salah.';
                 }
@@ -131,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } else {
                 logLoginAttempt(null, $email, false);
-                $error = 'Email atau password salah';
+                $error = 'Email atau password salah.';
             }
         } else {
             $error = 'Koneksi database gagal. Silakan coba lagi.';

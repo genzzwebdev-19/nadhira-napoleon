@@ -13,6 +13,28 @@ if (function_exists('runOrderExpiryIfDue')) {
 $is_home = true; // flag for hero-specific navbar styling
 $page_title = 'Premium Oleh-Oleh Khas Riau';
 $meta_description = 'Pusat oleh-oleh premium khas Riau. Nikmati Napoleon, Pancake Durian, Cake, dan berbagai oleh-oleh khas Pekanbaru dengan cita rasa terbaik.';
+
+// Self-healing: pastikan tabel packages tersedia (dipakai section Paket Oleh-Oleh)
+$connInstall = getConnection();
+if ($connInstall) {
+    $chkPkg = $connInstall->query("SHOW TABLES LIKE 'packages'");
+    if (!$chkPkg || $chkPkg->num_rows === 0) {
+        $connInstall->query("CREATE TABLE IF NOT EXISTS packages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            product_id INT NULL,
+            name VARCHAR(255) NOT NULL,
+            description TEXT,
+            price DECIMAL(15,2) NOT NULL DEFAULT 0,
+            image VARCHAR(500),
+            is_active BOOLEAN DEFAULT TRUE,
+            sort_order INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_active (is_active),
+            INDEX idx_sort (sort_order)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
+}
+
 include 'includes/header.php';
 ?>
 

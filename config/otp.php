@@ -106,15 +106,8 @@ function generateOtpCode() {
     return (string)random_int(100000, 999999);
 }
 
-// Kunci HMAC OTP: bisa diatur dari Admin > Pengaturan (setting wa_otp_hmac_key)
-// agar tidak statis di source; fallback ke nilai lama bila belum diatur.
-function otpHmacKey() {
-    $k = trim((string)getSetting('wa_otp_hmac_key', ''));
-    return $k !== '' ? $k : 'nadhira-napoleon-otp';
-}
-
 function hashOtpCode($code) {
-    return hash_hmac('sha256', (string)$code, otpHmacKey());
+    return hash_hmac('sha256', (string)$code, 'nadhira-napoleon-otp');
 }
 
 // Simpan kode OTP (hash) ke tabel. Mengembalikan id (0 jika gagal).

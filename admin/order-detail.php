@@ -26,6 +26,7 @@ $order = $order->fetch_assoc();
 
 // Handle POST requests BEFORE layout.php outputs HTML
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_payment'])) {
+    verifyCsrf();
     requirePermission('payments', 'verify');
     $confId = (int)$_POST['confirmation_id'];
     $action = $_POST['verify_action'] ?? '';
@@ -54,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_payment'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['verify_payment'])) {
+    verifyCsrf();
     requirePermission('orders', 'edit');
     $updateFields = [];
     // Nomor resi lama (untuk deteksi perubahan → kirim email notifikasi resi)
@@ -276,6 +278,7 @@ require_once __DIR__ . '/layout.php';
                     <div class="admin-card">
                         <h3 class="admin-card-title">Update Status</h3>
                         <form method="POST">
+                            <?= csrfField() ?>
                             <div class="form-group">
                                 <label class="form-label">Status Pesanan</label>
                                 <select name="order_status" class="form-select">
@@ -431,6 +434,7 @@ require_once __DIR__ . '/layout.php';
 
                             <?php if ($isPending): ?>
                             <form method="POST" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <?= csrfField() ?>
                                 <input type="hidden" name="verify_payment" value="1">
                                 <input type="hidden" name="confirmation_id" value="<?= $pc['id'] ?>">
                                 <button type="submit" name="verify_action" value="verified" class="btn btn-primary btn-sm"
@@ -444,6 +448,7 @@ require_once __DIR__ . '/layout.php';
                             </form>
                             <!-- Reject Form (hidden) -->
                             <form method="POST" id="reject-form-<?= $pc['id'] ?>" style="display: none; margin-top: 8px;">
+                                <?= csrfField() ?>
                                 <input type="hidden" name="verify_payment" value="1">
                                 <input type="hidden" name="confirmation_id" value="<?= $pc['id'] ?>">
                                 <input type="hidden" name="verify_action" value="rejected">

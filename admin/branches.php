@@ -14,6 +14,7 @@ $success = '';
 
 // Handle actions BEFORE layout.php outputs HTML
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_branch'])) {
+    verifyCsrf();
     requirePermission('branches', (int)($_POST['id'] ?? 0) > 0 ? 'edit' : 'create');
     $name = trim($_POST['name'] ?? '');
     $address = trim($_POST['address'] ?? '');
@@ -181,6 +182,7 @@ require_once __DIR__ . '/layout.php';
             <div class="admin-card">
                 <h3 class="admin-card-title">Tambah Cabang Baru</h3>
                 <form method="POST" enctype="multipart/form-data">
+                    <?= csrfField() ?>
                     <input type="hidden" name="save_branch" value="1">
                     <div class="form-row">
                         <div class="form-group">
@@ -348,6 +350,7 @@ require_once __DIR__ . '/layout.php';
                     </div>
                     <div class="modal-body">
                         <form method="POST" enctype="multipart/form-data">
+                            <?= csrfField() ?>
                             <input type="hidden" name="save_branch" value="1">
                             <input type="hidden" name="id" id="edit-id">
                             <div class="form-row">

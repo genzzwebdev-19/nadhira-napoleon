@@ -322,12 +322,21 @@ function ensureShippingAddressSchema() {
         city VARCHAR(150) DEFAULT '',
         province VARCHAR(150) DEFAULT '',
         postal_code VARCHAR(20) DEFAULT '',
+        latitude DECIMAL(10,8) NULL,
+        longitude DECIMAL(11,8) NULL,
         is_default TINYINT(1) NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_user (user_id),
         INDEX idx_default (user_id, is_default)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    // Self-healing: tambahkan kolom GPS pada tabel lama yang belum punya
+    $r = $conn->query("SELECT COUNT(*) c FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'shipping_addresses' AND COLUMN_NAME = 'latitude'");
+    if ($r && (int)$r->fetch_assoc()['c'] === 0) {
+        $conn->query("ALTER TABLE shipping_addresses ADD COLUMN latitude DECIMAL(10,8) NULL AFTER postal_code");
+        $conn->query("ALTER TABLE shipping_addresses ADD COLUMN longitude DECIMAL(11,8) NULL AFTER latitude");
+    }
     $done = true;
     return (bool)$ok;
 }

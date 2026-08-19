@@ -90,7 +90,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_confirmation']
     $proofImagePath = '';
     if (empty($errors) && isset($_FILES['proof_image']) && $_FILES['proof_image']['error'] === UPLOAD_ERR_OK) {
         $file = $_FILES['proof_image'];
-        $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
         $allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $maxSize = 5 * 1024 * 1024; // 5MB
         $extension = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));

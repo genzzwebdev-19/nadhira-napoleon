@@ -40,6 +40,7 @@ if ($product) {
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrf();
     $name = trim($_POST['name'] ?? '');
     $category_id = (int)($_POST['category_id'] ?? 0);
     $description = trim($_POST['description'] ?? '');
@@ -251,6 +252,7 @@ $pageTitle = $action === 'edit' ? 'Edit Produk' : 'Tambah Produk';
             <div class="admin-card">
                 <h3 class="admin-card-title"><?= $action === 'edit' ? 'Edit Produk' : 'Tambah Produk Baru' ?></h3>
                 <form method="POST" enctype="multipart/form-data">
+                    <?= csrfField() ?>
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Nama Produk <span style="color: #EF4444;">*</span></label>

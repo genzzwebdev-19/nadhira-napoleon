@@ -43,8 +43,6 @@ Hasil audit keamanan (code review + tes aktif aman di localhost) — 15 temuan d
 - **`pages/wishlist.php`**: aksi hapus & tambah-semua-ke-keranjang kini **POST + CSRF**
 - **`pages/product-detail.php`**: form ulasan kini butuh **CSRF**
 - **`pages/invoice.php` & `pages/download-invoice-pdf.php`**: cek akses admin memakai `isAdminUser()` (RBAC) — sebelumnya cek kolom `role='admin'` lama sehingga admin RBAC tidak bisa membuka invoice dari panel
-- **`ajax/midtrans-status.php`**: rate limit polling (20/5 menit per IP) agar API Midtrans tidak dipanggil berulang
-- **`config/otp.php`**: kunci HMAC OTP bisa diatur dari Pengaturan (`wa_otp_hmac_key`), fallback ke nilai lama
 - **`.htaccess`**: `expose_php Off` + `display_errors Off` (best effort, mod_php)
 - **`composer audit`**: dependensi (dompdf, phpmailer) bersih dari advisories yang diketahui
 

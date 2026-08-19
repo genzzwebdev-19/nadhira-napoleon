@@ -11,7 +11,7 @@ if (isLoggedIn()) {
 
 // Redirect balik (mis. dari checkout) — hanya path internal halaman (/pages/...) yang diizinkan.
 $redirect = trim($_GET['redirect'] ?? ($_POST['redirect'] ?? ''));
-if ($redirect !== '' && (strpos($redirect, 'http') === 0 || strpos($redirect, '//') === 0 || $redirect[0] !== '/' || strpos($redirect, '\\\\') !== false || strpos($redirect, '%') !== false || strpos($redirect, '/pages/') !== 0)) {
+if ($redirect !== '' && (strpos($redirect, 'http') === 0 || strpos($redirect, '//') === 0 || $redirect[0] !== '/' || strpos($redirect, '\\') !== false || strpos($redirect, '%') !== false || strpos($redirect, '/pages/') !== 0)) {
     $redirect = '';
 }
 

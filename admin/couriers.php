@@ -12,6 +12,7 @@ $success = '';
 
 // ============ ACTION: Simpan kurir ============
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_courier'])) {
+    verifyCsrf();
     requirePermission('couriers', (int)($_POST['id'] ?? 0) > 0 ? 'edit' : 'create');
     $name = trim($_POST['name'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
@@ -107,6 +108,7 @@ require_once __DIR__ . '/layout.php';
             <div class="admin-card">
                 <h3 class="admin-card-title">Tambah Kurir Baru</h3>
                 <form method="POST">
+                    <?= csrfField() ?>
                     <input type="hidden" name="save_courier" value="1">
                     <div class="form-row">
                         <div class="form-group">

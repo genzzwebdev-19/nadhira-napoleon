@@ -12,6 +12,7 @@ $success = '';
 
 // Handle POST/GET actions BEFORE layout.php outputs HTML
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrf();
     requirePermission('categories', (int)($_POST['id'] ?? 0) > 0 ? 'edit' : 'create');
     $name = trim($_POST['name'] ?? '');
     $description = trim($_POST['description'] ?? '');
@@ -64,6 +65,7 @@ require_once __DIR__ . '/layout.php';
             <div class="admin-card">
                 <h3 class="admin-card-title">Tambah Kategori Baru</h3>
                 <form method="POST" style="display: flex; gap: var(--space-md); flex-wrap: wrap; align-items: flex-end;">
+                    <?= csrfField() ?>
                     <div class="form-group" style="flex: 2; min-width: 200px; margin-bottom: 0;">
                         <label class="form-label">Nama Kategori</label>
                         <input type="text" name="name" class="form-input" placeholder="Nama kategori" required>
@@ -142,6 +144,7 @@ require_once __DIR__ . '/layout.php';
                     </div>
                     <div class="modal-body">
                         <form method="POST">
+                            <?= csrfField() ?>
                             <input type="hidden" name="id" id="edit-id">
                             <div class="form-group">
                                 <label class="form-label">Nama Kategori</label>

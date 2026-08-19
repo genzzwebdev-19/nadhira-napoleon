@@ -13,6 +13,7 @@ $errors = [];
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_slide'])) {
+    verifyCsrf();
     requirePermission('hero_slides', (int)($_POST['edit_id'] ?? 0) > 0 ? 'edit' : 'create');
     $label = trim($_POST['label'] ?? '');
     $sort_order = (int)($_POST['sort_order'] ?? 0);
@@ -274,6 +275,7 @@ if (isset($_GET['edit'])) {
         <?= $editSlide ? 'Edit Slide' : 'Tambah Slide Baru' ?>
     </h3>
     <form method="POST" enctype="multipart/form-data">
+        <?= csrfField() ?>
         <input type="hidden" name="save_slide" value="1">
         <?php if ($editSlide): ?>
             <input type="hidden" name="edit_id" value="<?= (int)$editSlide['id'] ?>">
